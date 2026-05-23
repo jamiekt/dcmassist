@@ -44,15 +44,32 @@ class V1ObjectPlugin(ObjectPlugin):
     ) -> list[FQN]:
         if not self.SHOW_FORM:
             raise NotImplementedError(self.type_name)
+
+        target_schemas = self._target_schemas(cursor, database, schemas)
+
         rows: list[FQN] = []
-        if schemas:
-            for schema in schemas:
-                cursor.execute(f"{self.SHOW_FORM} IN SCHEMA {database}.{schema}")
-                rows.extend(self._rows_to_fqns(cursor.fetchall(), database))
-        else:
-            cursor.execute(f"{self.SHOW_FORM} IN DATABASE {database}")
+        for schema in sorted(target_schemas):
+            cursor.execute(f"{self.SHOW_FORM} IN SCHEMA {database}.{schema}")
             rows.extend(self._rows_to_fqns(cursor.fetchall(), database))
         return sorted(rows, key=lambda f: (f.schema or "", f.name))
+
+    def _target_schemas(
+        self, cursor: Any, database: str, schemas: tuple[str, ...] | None
+    ) -> list[str]:
+        """Resolve which schemas to enumerate.
+
+        With an explicit filter we trust the caller. Without one we list every schema
+        in the database first (cheap — schemas are few) and exclude INFORMATION_SCHEMA,
+        which holds Snowflake's system views and would otherwise pollute every export.
+        """
+        if schemas:
+            return list(schemas)
+        cursor.execute(f"SHOW SCHEMAS IN DATABASE {database}")
+        return [
+            row["name"]
+            for row in cursor.fetchall()
+            if row["name"] != "INFORMATION_SCHEMA"
+        ]
 
     def _rows_to_fqns(self, rows: list[dict[str, Any]], database: str) -> list[FQN]:
         """Convert DictCursor rows into FQNs.

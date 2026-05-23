@@ -10,22 +10,39 @@ from dcmexporter.objects.tag import plugin
 from dcmexporter.types import FQN
 
 
-def test_discover_uses_show_tags_in_database() -> None:
+def test_discover_lists_schemas_then_iterates() -> None:
     cursor = MagicMock()
-    cursor.fetchall.return_value = [
-        {"name": "TG1", "schema_name": "PUBLIC"},
-        {"name": "TG2", "schema_name": "PUBLIC"},
-    ]
+    sql_log: list[str] = []
+    cursor.execute.side_effect = lambda sql: sql_log.append(sql)
+    fetch_responses = iter(
+        [
+            [{"name": "PUBLIC", "database_name": "MYDB"}],
+            [
+                {"name": "TG1", "schema_name": "PUBLIC", "database_name": "MYDB"},
+                {"name": "TG2", "schema_name": "PUBLIC", "database_name": "MYDB"},
+            ],
+        ]
+    )
+    cursor.fetchall.side_effect = lambda: next(fetch_responses)
+
     out = plugin.discover(cursor, "MYDB", None)
-    cursor.execute.assert_called_once_with("SHOW TAGS IN DATABASE MYDB")
+    assert sql_log == [
+        "SHOW SCHEMAS IN DATABASE MYDB",
+        "SHOW TAGS IN SCHEMA MYDB.PUBLIC",
+    ]
     assert [str(f) for f in out] == ["MYDB.PUBLIC.TG1", "MYDB.PUBLIC.TG2"]
 
 
 def test_discover_filters_by_schema() -> None:
     cursor = MagicMock()
-    cursor.fetchall.return_value = [{"name": "TG", "schema_name": "S"}]
-    plugin.discover(cursor, "MYDB", ("S",))
-    cursor.execute.assert_called_once_with("SHOW TAGS IN SCHEMA MYDB.S")
+    sql_log: list[str] = []
+    cursor.execute.side_effect = lambda sql: sql_log.append(sql)
+    cursor.fetchall.return_value = [
+        {"name": "TG", "schema_name": "S", "database_name": "MYDB"}
+    ]
+    out = plugin.discover(cursor, "MYDB", ("S",))
+    assert sql_log == ["SHOW TAGS IN SCHEMA MYDB.S"]
+    assert [str(f) for f in out] == ["MYDB.S.TG"]
 
 
 def test_get_ddl_calls_get_ddl_function() -> None:

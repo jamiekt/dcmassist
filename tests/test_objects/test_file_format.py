@@ -10,22 +10,39 @@ from dcmexporter.objects.file_format import plugin
 from dcmexporter.types import FQN
 
 
-def test_discover_uses_show_file_formats_in_database() -> None:
+def test_discover_lists_schemas_then_iterates() -> None:
     cursor = MagicMock()
-    cursor.fetchall.return_value = [
-        {"name": "FF1", "schema_name": "PUBLIC"},
-        {"name": "FF2", "schema_name": "PUBLIC"},
-    ]
+    sql_log: list[str] = []
+    cursor.execute.side_effect = lambda sql: sql_log.append(sql)
+    fetch_responses = iter(
+        [
+            [{"name": "PUBLIC", "database_name": "MYDB"}],
+            [
+                {"name": "FF1", "schema_name": "PUBLIC", "database_name": "MYDB"},
+                {"name": "FF2", "schema_name": "PUBLIC", "database_name": "MYDB"},
+            ],
+        ]
+    )
+    cursor.fetchall.side_effect = lambda: next(fetch_responses)
+
     out = plugin.discover(cursor, "MYDB", None)
-    cursor.execute.assert_called_once_with("SHOW FILE FORMATS IN DATABASE MYDB")
+    assert sql_log == [
+        "SHOW SCHEMAS IN DATABASE MYDB",
+        "SHOW FILE FORMATS IN SCHEMA MYDB.PUBLIC",
+    ]
     assert [str(f) for f in out] == ["MYDB.PUBLIC.FF1", "MYDB.PUBLIC.FF2"]
 
 
 def test_discover_filters_by_schema() -> None:
     cursor = MagicMock()
-    cursor.fetchall.return_value = [{"name": "FF", "schema_name": "S"}]
-    plugin.discover(cursor, "MYDB", ("S",))
-    cursor.execute.assert_called_once_with("SHOW FILE FORMATS IN SCHEMA MYDB.S")
+    sql_log: list[str] = []
+    cursor.execute.side_effect = lambda sql: sql_log.append(sql)
+    cursor.fetchall.return_value = [
+        {"name": "FF", "schema_name": "S", "database_name": "MYDB"}
+    ]
+    out = plugin.discover(cursor, "MYDB", ("S",))
+    assert sql_log == ["SHOW FILE FORMATS IN SCHEMA MYDB.S"]
+    assert [str(f) for f in out] == ["MYDB.S.FF"]
 
 
 def test_get_ddl_calls_get_ddl_function() -> None:
