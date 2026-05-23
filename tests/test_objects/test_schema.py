@@ -10,22 +10,39 @@ from dcmexporter.objects.schema import plugin
 from dcmexporter.types import FQN
 
 
-def test_discover_uses_show_schemas_in_database() -> None:
+def test_discover_uses_show_schemas_in_database_when_no_filter() -> None:
     cursor = MagicMock()
+    sql_log: list[str] = []
+    cursor.execute.side_effect = lambda sql: sql_log.append(sql)
     cursor.fetchall.return_value = [
-        {"name": "S1", "schema_name": "S1"},
-        {"name": "S2", "schema_name": "S2"},
+        {"name": "PUBLIC", "database_name": "MYDB"},
+        {"name": "INFORMATION_SCHEMA", "database_name": "MYDB"},
+        {"name": "ANALYTICS", "database_name": "MYDB"},
     ]
     out = plugin.discover(cursor, "MYDB", None)
-    cursor.execute.assert_called_once_with("SHOW SCHEMAS IN DATABASE MYDB")
-    assert [str(f) for f in out] == ["MYDB.S1.S1", "MYDB.S2.S2"]
+    assert sql_log == ["SHOW SCHEMAS IN DATABASE MYDB"]
+    # INFORMATION_SCHEMA is excluded (system schema).
+    assert [str(f) for f in out] == ["MYDB.ANALYTICS.ANALYTICS", "MYDB.PUBLIC.PUBLIC"]
 
 
-def test_discover_filters_by_schema() -> None:
+def test_discover_filters_with_like_per_schema() -> None:
     cursor = MagicMock()
-    cursor.fetchall.return_value = [{"name": "S", "schema_name": "S"}]
-    plugin.discover(cursor, "MYDB", ("S",))
-    cursor.execute.assert_called_once_with("SHOW SCHEMAS IN SCHEMA MYDB.S")
+    sql_log: list[str] = []
+    cursor.execute.side_effect = lambda sql: sql_log.append(sql)
+    fetch_responses = iter(
+        [
+            [{"name": "S1", "database_name": "MYDB"}],
+            [{"name": "S2", "database_name": "MYDB"}],
+        ]
+    )
+    cursor.fetchall.side_effect = lambda: next(fetch_responses)
+
+    out = plugin.discover(cursor, "MYDB", ("S1", "S2"))
+    assert sql_log == [
+        "SHOW SCHEMAS LIKE 'S1' IN DATABASE MYDB",
+        "SHOW SCHEMAS LIKE 'S2' IN DATABASE MYDB",
+    ]
+    assert [str(f) for f in out] == ["MYDB.S1.S1", "MYDB.S2.S2"]
 
 
 def test_get_ddl_calls_get_ddl_function() -> None:
