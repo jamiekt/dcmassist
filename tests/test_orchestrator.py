@@ -111,8 +111,9 @@ def test_export_per_object_get_ddl_failure_continues(tmp_path: Path, capsys) -> 
         code = export(_cfg(out))
 
     assert code == 0
-    err = capsys.readouterr().err
-    assert "T_BAD" in err
+    log_text = (out / "dcmexporter.log").read_text()
+    assert "T_BAD" in log_text
+    assert "permission denied" in log_text
     body = (out / "sources" / "definitions" / "table.sql").read_text()
     assert "T_OK" in body
     assert "T_BAD" not in body
