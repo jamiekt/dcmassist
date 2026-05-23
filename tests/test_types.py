@@ -53,3 +53,21 @@ def test_fqn_str_dotted() -> None:
 def test_fqn_str_no_schema() -> None:
     fqn = FQN(database="MYDB", schema=None, name="MYDB")
     assert str(fqn) == "MYDB"
+
+
+def test_fqn_quoted_dotted() -> None:
+    """Quoted form is what Snowflake needs for identifiers like '15MIN_X' or
+    mixed case — bare-uppercase resolution silently fails on those."""
+    fqn = FQN(database="MYDB", schema="PUBLIC", name="15MIN_X")
+    assert fqn.quoted == '"MYDB"."PUBLIC"."15MIN_X"'
+
+
+def test_fqn_quoted_no_schema() -> None:
+    fqn = FQN(database="MYDB", schema=None, name="MYDB")
+    assert fqn.quoted == '"MYDB"'
+
+
+def test_fqn_quoted_escapes_double_quotes() -> None:
+    """Snowflake string-escape for `"` inside a quoted identifier is `""`."""
+    fqn = FQN(database="MYDB", schema="PUBLIC", name='WEIRD"NAME')
+    assert fqn.quoted == '"MYDB"."PUBLIC"."WEIRD""NAME"'

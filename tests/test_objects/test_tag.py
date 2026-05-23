@@ -50,7 +50,9 @@ def test_get_ddl_calls_get_ddl_function() -> None:
     cursor.fetchone.return_value = ["CREATE OR REPLACE TAG MYDB.PUBLIC.TG"]
     fqn = FQN("MYDB", "PUBLIC", "TG")
     out = plugin.get_ddl(cursor, fqn)
-    cursor.execute.assert_called_once_with("SELECT GET_DDL('TAG', 'MYDB.PUBLIC.TG')")
+    cursor.execute.assert_called_once_with(
+        'SELECT GET_DDL(\'TAG\', \'"MYDB"."PUBLIC"."TG"\')'
+    )
     assert out.startswith("CREATE")
 
 

@@ -102,7 +102,10 @@ class V1ObjectPlugin(ObjectPlugin):
         return out
 
     def get_ddl(self, cursor: Any, fqn: FQN) -> str:
-        cursor.execute(f"SELECT GET_DDL('{self.GET_DDL_TYPE}', '{fqn}')")
+        # Pass the quoted FQN literal so non-uppercase / digit-leading / quoted
+        # identifiers resolve correctly. GET_DDL's second arg is a SQL string,
+        # so we wrap the quoted identifier in single quotes.
+        cursor.execute(f"SELECT GET_DDL('{self.GET_DDL_TYPE}', '{fqn.quoted}')")
         row = cursor.fetchone()
         if isinstance(row, dict):
             return next(iter(row.values()))

@@ -68,7 +68,7 @@ def test_get_ddl_uses_desc_stage_and_synthesizer() -> None:
     ]
     fqn = FQN("MYDB", "PUBLIC", "S")
     out = plugin.get_ddl(cursor, fqn)
-    assert sql_log == ["DESC STAGE MYDB.PUBLIC.S"]
+    assert sql_log == ['DESC STAGE "MYDB"."PUBLIC"."S"']
     assert "CREATE OR REPLACE STAGE MYDB.PUBLIC.S" in out
     assert "STORAGE_INTEGRATION = MY_INT" in out
 

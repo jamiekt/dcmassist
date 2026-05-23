@@ -50,7 +50,9 @@ def test_get_ddl_calls_get_ddl_function() -> None:
     cursor.fetchone.return_value = ["CREATE OR REPLACE TABLE MYDB.PUBLIC.T (X INT)"]
     fqn = FQN("MYDB", "PUBLIC", "T")
     out = plugin.get_ddl(cursor, fqn)
-    cursor.execute.assert_called_once_with("SELECT GET_DDL('TABLE', 'MYDB.PUBLIC.T')")
+    cursor.execute.assert_called_once_with(
+        'SELECT GET_DDL(\'TABLE\', \'"MYDB"."PUBLIC"."T"\')'
+    )
     assert out.startswith("CREATE")
 
 

@@ -54,3 +54,17 @@ class FQN:
         if self.schema is None:
             return self.name
         return f"{self.database}.{self.schema}.{self.name}"
+
+    @property
+    def quoted(self) -> str:
+        """Snowflake-quoted form: `"DB"."SCHEMA"."NAME"`.
+
+        Required for identifiers that aren't valid bare names — leading digit,
+        non-uppercase letters, special characters. Without quoting, Snowflake
+        silently up-cases and rejects names that were created with quotes.
+        Embedded `"` is escaped by doubling it.
+        """
+        parts = (
+            [self.database, self.schema, self.name] if self.schema else [self.database]
+        )
+        return ".".join(f'"{p.replace(chr(34), chr(34) * 2)}"' for p in parts)
