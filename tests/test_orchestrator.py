@@ -9,7 +9,7 @@ from dcmexporter.config import Config
 from dcmexporter.orchestrator import export
 
 
-def _cfg(out_folder: Path) -> Config:
+def _cfg(out_folder: Path, *, use_macros: bool = True) -> Config:
     return Config(
         database="MYDB",
         schemas=(),
@@ -22,7 +22,7 @@ def _cfg(out_folder: Path) -> Config:
         includes=("Table",),  # narrow surface for golden test
         excludes=(),
         comment="exported by dcmexporter",
-        use_macros=True,
+        use_macros=use_macros,
         out_folder=out_folder,
         force=True,
     )
@@ -129,6 +129,42 @@ def test_export_per_object_get_ddl_failure_continues(tmp_path: Path, capsys) -> 
     body = (out / "sources" / "definitions" / "table.sql").read_text()
     assert "T_OK" in body
     assert "T_BAD" not in body
+
+
+def test_export_no_macros_folder_when_macros_disabled(tmp_path: Path) -> None:
+    """With use_macros=False the sources/macros folder must not exist."""
+    out = tmp_path / "out"
+    fake_cursor = MagicMock()
+    fake_conn = MagicMock()
+    fake_conn.account = "AB12345"
+    fake_conn.cursor.return_value = fake_cursor
+
+    def execute_side_effect(sql, *args, **kwargs):
+        fake_cursor._last_sql = sql
+
+    def fetchall_side_effect():
+        if "SHOW SCHEMAS" in fake_cursor._last_sql:
+            return [{"name": "PUBLIC", "database_name": "MYDB"}]
+        if "SHOW TABLES" in fake_cursor._last_sql:
+            return [{"name": "T1", "schema_name": "PUBLIC"}]
+        return []
+
+    def fetchone_side_effect():
+        if "GET_DDL" in fake_cursor._last_sql:
+            return ["CREATE OR REPLACE TABLE MYDB.PUBLIC.T1 (X INT)"]
+        return None
+
+    fake_cursor.execute.side_effect = execute_side_effect
+    fake_cursor.fetchall.side_effect = fetchall_side_effect
+    fake_cursor.fetchone.side_effect = fetchone_side_effect
+
+    with patch("dcmexporter.orchestrator.open_connection") as oc:
+        oc.return_value = fake_conn
+        code = export(_cfg(out, use_macros=False))
+
+    assert code == 0
+    assert (out / "sources" / "definitions" / "table.sql").exists()
+    assert not (out / "sources" / "macros").exists()
 
 
 def test_export_no_objects_returns_4_when_errors(tmp_path: Path) -> None:
