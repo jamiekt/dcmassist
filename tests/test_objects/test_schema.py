@@ -20,7 +20,7 @@ def test_discover_uses_show_schemas_in_database_when_no_filter() -> None:
         {"name": "ANALYTICS", "database_name": "MYDB"},
     ]
     out = plugin.discover(cursor, "MYDB", None)
-    assert sql_log == ["SHOW SCHEMAS IN DATABASE MYDB"]
+    assert sql_log == ["SHOW SCHEMAS IN DATABASE MYDB LIMIT 10000"]
     # INFORMATION_SCHEMA is excluded (system schema).
     assert [str(f) for f in out] == ["MYDB.ANALYTICS.ANALYTICS", "MYDB.PUBLIC.PUBLIC"]
 

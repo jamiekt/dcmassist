@@ -27,8 +27,8 @@ def test_discover_lists_schemas_then_iterates() -> None:
 
     out = plugin.discover(cursor, "MYDB", None)
     assert sql_log == [
-        "SHOW SCHEMAS IN DATABASE MYDB",
-        "SHOW FILE FORMATS IN SCHEMA MYDB.PUBLIC",
+        "SHOW SCHEMAS IN DATABASE MYDB LIMIT 10000",
+        "SHOW FILE FORMATS IN SCHEMA MYDB.PUBLIC LIMIT 10000",
     ]
     assert [str(f) for f in out] == ["MYDB.PUBLIC.FF1", "MYDB.PUBLIC.FF2"]
 
@@ -41,7 +41,7 @@ def test_discover_filters_by_schema() -> None:
         {"name": "FF", "schema_name": "S", "database_name": "MYDB"}
     ]
     out = plugin.discover(cursor, "MYDB", ("S",))
-    assert sql_log == ["SHOW FILE FORMATS IN SCHEMA MYDB.S"]
+    assert sql_log == ["SHOW FILE FORMATS IN SCHEMA MYDB.S LIMIT 10000"]
     assert [str(f) for f in out] == ["MYDB.S.FF"]
 
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from dcmexporter.objects._show_paging import paginated_show
 from dcmexporter.plugin import ObjectPlugin, ProgressCallback
 from dcmexporter.rewrite import (
     create_to_define,
@@ -57,8 +58,10 @@ class V1ObjectPlugin(ObjectPlugin):
             if progress is not None:
                 count = f" {index}/{total}" if total > 1 else ""
                 progress(f"discovering {self.type_name}s in{count} {database}.{schema}")
-            cursor.execute(f"{self.SHOW_FORM} IN SCHEMA {database}.{schema}")
-            rows.extend(self._rows_to_fqns(cursor.fetchall(), database))
+            page_rows = paginated_show(
+                cursor, f"{self.SHOW_FORM} IN SCHEMA {database}.{schema}"
+            )
+            rows.extend(self._rows_to_fqns(page_rows, database))
         return sorted(rows, key=lambda f: (f.schema or "", f.name))
 
     def _target_schemas(
@@ -72,12 +75,8 @@ class V1ObjectPlugin(ObjectPlugin):
         """
         if schemas:
             return list(schemas)
-        cursor.execute(f"SHOW SCHEMAS IN DATABASE {database}")
-        return [
-            row["name"]
-            for row in cursor.fetchall()
-            if row["name"] != "INFORMATION_SCHEMA"
-        ]
+        rows = paginated_show(cursor, f"SHOW SCHEMAS IN DATABASE {database}")
+        return [row["name"] for row in rows if row["name"] != "INFORMATION_SCHEMA"]
 
     def _rows_to_fqns(self, rows: list[dict[str, Any]], database: str) -> list[FQN]:
         """Convert DictCursor rows into FQNs.
