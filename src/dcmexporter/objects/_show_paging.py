@@ -12,7 +12,7 @@ rows (or zero rows).
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 DEFAULT_PAGE_SIZE = 10000
 
@@ -22,12 +22,17 @@ def paginated_show(
     base_sql: str,
     *,
     page_size: int = DEFAULT_PAGE_SIZE,
+    on_page: Callable[[int], None] | None = None,
 ) -> list[dict[str, Any]]:
     """Run `base_sql` with LIMIT/FROM pagination and return the concatenated rows.
 
     `base_sql` should be a SHOW statement *without* a trailing LIMIT clause —
     e.g. `SHOW TABLES IN SCHEMA MYDB.PUBLIC`. The helper appends pagination on
     each call.
+
+    If `on_page` is supplied it is called once per non-empty page with the
+    running row total — useful for status-line updates on schemas that span
+    many pages (tens of thousands of objects).
     """
     rows: list[dict[str, Any]] = []
     last_name: str | None = None
@@ -41,6 +46,8 @@ def paginated_show(
         if not page:
             break
         rows.extend(page)
+        if on_page is not None:
+            on_page(len(rows))
         if len(page) < page_size:
             break
         last_name = page[-1]["name"]

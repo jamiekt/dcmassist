@@ -219,3 +219,6 @@ __marimo__/
 
 # dcmexporter default output folder
 out/
+
+# Claude Code local settings
+.claude/

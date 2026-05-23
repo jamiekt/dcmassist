@@ -65,6 +65,27 @@ def test_discover_iterates_schemas_when_no_filter() -> None:
     assert [str(f) for f in out] == ["MYDB.ANALYTICS.T2", "MYDB.PUBLIC.T1"]
 
 
+def test_discover_reports_running_total_on_each_page() -> None:
+    """For schemas with many objects, progress callback ticks up as pages arrive.
+
+    Without this, schemas like EXPERIMENTATION.STATSIG (50k+ tables) would
+    appear to hang while paginated_show silently fetches several 10k pages.
+    """
+    cursor = MagicMock()
+    cursor.execute.side_effect = lambda sql: None
+    cursor.fetchall.return_value = [
+        {"name": "T1", "schema_name": "S"},
+        {"name": "T2", "schema_name": "S"},
+    ]
+
+    seen: list[str] = []
+    plugin = _MinimalPlugin()
+    plugin.discover(cursor, "MYDB", ("S",), progress=seen.append)
+
+    assert seen[0] == "discovering Tests in MYDB.S"
+    assert any("found 2" in msg for msg in seen[1:]), seen
+
+
 def test_discover_with_schemas_filter_skips_schema_listing() -> None:
     cursor = MagicMock()
     sql_log: list[str] = []
