@@ -20,8 +20,9 @@ def test_v1_and_unimplemented_are_disjoint() -> None:
 
 
 def test_v1_types_match_spec() -> None:
+    """Database is intentionally excluded — DCM rejects DEFINE DATABASE for
+    the project's parent database. See UNIMPLEMENTED_TYPES."""
     assert V1_TYPES == (
-        "Database",
         "Schema",
         "Table",
         "View",
@@ -30,6 +31,13 @@ def test_v1_types_match_spec() -> None:
         "File format",
         "Tag",
     )
+
+
+def test_database_is_unimplemented() -> None:
+    """Keeping it in DCM_TYPES means --include Database / --exclude Database
+    still validate, but no DEFINE block is ever emitted."""
+    assert "Database" in UNIMPLEMENTED_TYPES
+    assert "Database" not in V1_TYPES
 
 
 def test_normalise_type_case_insensitive() -> None:
