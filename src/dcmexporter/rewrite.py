@@ -69,3 +69,39 @@ def inject_comment_if_missing(
     else:
         suffix = ""
     return f"{body} COMMENT='{escaped}'{suffix}"
+
+
+def parameterise_database(ddl: str, *, database: str) -> str:
+    """Replace whole-identifier occurrences of `database` (case-insensitive) with
+    the literal string `{{ database }}`.
+
+    Whole-identifier means: bounded on both sides by characters that do not form part
+    of a Snowflake identifier (letters, digits, `_`, `$`). Substring occurrences inside
+    longer identifiers are preserved.
+    """
+    pattern = re.compile(
+        rf"(?<![A-Za-z0-9_$]){re.escape(database)}(?![A-Za-z0-9_$])",
+        re.IGNORECASE,
+    )
+    return pattern.sub("{{ database }}", ddl)
+
+
+def _format_value(value: object) -> str:
+    if isinstance(value, str):
+        escaped = value.replace("'", "\\'")
+        return f"'{escaped}'"
+    return repr(value)
+
+
+def render_macro_invocation(macro_name: str, *, kwargs: dict[str, object]) -> str:
+    """Render a Jinja `{{ macro_name(...) }}` invocation with keyword args.
+
+    None values are omitted. String values are single-quoted (single quotes within
+    are backslash-escaped, matching Jinja's expression syntax).
+    """
+    parts = [
+        f"{key}={_format_value(value)}"
+        for key, value in kwargs.items()
+        if value is not None
+    ]
+    return f"{{{{ {macro_name}({', '.join(parts)}) }}}}"

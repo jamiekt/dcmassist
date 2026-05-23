@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from dcmexporter.rewrite import create_to_define, inject_comment_if_missing
+from dcmexporter.rewrite import (
+    create_to_define,
+    inject_comment_if_missing,
+    parameterise_database,
+    render_macro_invocation,
+)
 
 
 def test_create_to_define_table() -> None:
@@ -51,3 +56,62 @@ def test_inject_comment_unsupported_type_is_noop() -> None:
         supports_comment=False,
     )
     assert "COMMENT" not in out
+
+
+def test_parameterise_database_replaces_fqn() -> None:
+    out = parameterise_database("DEFINE TABLE MYDB.PUBLIC.FOO (X INT)", database="MYDB")
+    assert "{{ database }}.PUBLIC.FOO" in out
+    assert "MYDB" not in out.replace("{{ database }}", "")
+
+
+def test_parameterise_database_skips_substring_in_other_identifier() -> None:
+    out = parameterise_database(
+        "DEFINE TABLE MYDB.PUBLIC.MYDB_AUDIT (X INT)", database="MYDB"
+    )
+    assert "{{ database }}.PUBLIC.MYDB_AUDIT" in out
+
+
+def test_parameterise_database_replaces_inside_body() -> None:
+    out = parameterise_database(
+        "DEFINE STAGE MYDB.PUBLIC.S URL='s3://bucket' STORAGE_INTEGRATION = MYDB_INT",
+        database="MYDB",
+    )
+    assert "{{ database }}.PUBLIC.S" in out
+    assert "MYDB_INT" in out
+
+
+def test_parameterise_database_case_insensitive_match() -> None:
+    out = parameterise_database("DEFINE TABLE mydb.public.foo (x INT)", database="MYDB")
+    assert "{{ database }}" in out
+
+
+def test_parameterise_database_no_change_when_absent() -> None:
+    src = "DEFINE WAREHOUSE WH WAREHOUSE_SIZE='X-Small'"
+    assert parameterise_database(src, database="MYDB") == src
+
+
+def test_render_macro_invocation_quotes_strings() -> None:
+    out = render_macro_invocation(
+        "define_table",
+        kwargs={
+            "database": "{{ database }}",
+            "schema": "PUBLIC",
+            "name": "FOO",
+            "columns": [{"name": "X", "type": "INT"}],
+        },
+    )
+    assert out.startswith("{{ define_table(")
+    assert "database='{{ database }}'" in out
+    assert "schema='PUBLIC'" in out
+    assert "name='FOO'" in out
+    assert "columns=[{'name': 'X', 'type': 'INT'}]" in out
+    assert out.endswith(") }}")
+
+
+def test_render_macro_invocation_omits_none_values() -> None:
+    out = render_macro_invocation(
+        "define_table",
+        kwargs={"name": "FOO", "comment": None},
+    )
+    assert "comment=" not in out
+    assert "name='FOO'" in out
