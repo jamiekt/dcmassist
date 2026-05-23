@@ -11,6 +11,7 @@ from dcmexporter.makefile import render_makefile
 from dcmexporter.manifest import render_manifest
 from dcmexporter.objects import build_registry
 from dcmexporter.render import OutFolderError, write_outputs
+from dcmexporter.status import StatusLine
 from dcmexporter.types import V1_TYPES
 
 
@@ -18,8 +19,10 @@ def export(cfg: Config) -> int:
     registry = build_registry()
     account_identifier = ""
     conn: Any | None = None
+    status = StatusLine()
 
     try:
+        status.update("connecting to Snowflake...")
         conn = open_connection(cfg.connection)
         account_identifier = resolve_account_identifier(conn)
         cursor = conn.cursor()
@@ -34,6 +37,7 @@ def export(cfg: Config) -> int:
             if type_name not in V1_TYPES:
                 # known-supported but unimplemented -> skip silently
                 if not cfg.includes:
+                    status.clear()
                     print(
                         f"[dcmexporter] skipping unsupported type: {type_name}",
                         file=sys.stderr,
@@ -42,8 +46,10 @@ def export(cfg: Config) -> int:
             plugin = registry.get(type_name)
 
             try:
+                status.update(f"discovering {type_name}s...")
                 fqns = plugin.discover(cursor, cfg.database, cfg.schemas or None)
             except Exception as exc:  # noqa: BLE001
+                status.clear()
                 print(
                     f"[dcmexporter] discover failed for {type_name}: {exc}",
                     file=sys.stderr,
@@ -52,7 +58,9 @@ def export(cfg: Config) -> int:
                 continue
 
             blocks: list[str] = []
-            for fqn in fqns:
+            total = len(fqns)
+            for index, fqn in enumerate(fqns, start=1):
+                status.update(f"exporting {type_name} {index}/{total} {fqn}")
                 try:
                     ddl = plugin.get_ddl(cursor, fqn)
                     block = plugin.to_define_and_invocation(
@@ -62,6 +70,7 @@ def export(cfg: Config) -> int:
                         database=cfg.database,
                     )
                 except Exception as exc:  # noqa: BLE001
+                    status.clear()
                     print(
                         f"[dcmexporter] type={type_name} fqn={fqn} error={exc}",
                         file=sys.stderr,
@@ -75,6 +84,7 @@ def export(cfg: Config) -> int:
             if macros is not None:
                 macros[plugin.file_slug] = plugin.macro_definition()
 
+        status.update("writing output files...")
         manifest = render_manifest(cfg, account_identifier=account_identifier)
         makefile = render_makefile(cfg)
         try:
@@ -87,8 +97,11 @@ def export(cfg: Config) -> int:
                 force=cfg.force,
             )
         except OutFolderError as exc:
+            status.clear()
             print(f"[dcmexporter] {exc}", file=sys.stderr)
             return 5
+
+        status.clear()
 
         if cfg.templating_configuration_keys and cfg.configurations:
             keys = ", ".join(cfg.templating_configuration_keys)
@@ -107,6 +120,7 @@ def export(cfg: Config) -> int:
             return 4
         return 0
     finally:
+        status.clear()
         if conn is not None:
             try:
                 conn.close()
