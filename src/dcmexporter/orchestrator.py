@@ -60,7 +60,8 @@ def export(cfg: Config) -> int:
             blocks: list[str] = []
             total = len(fqns)
             for index, fqn in enumerate(fqns, start=1):
-                status.update(f"exporting {type_name} {index}/{total} {fqn}")
+                progress = f"{index}/{total} " if total > 1 else ""
+                status.update(f"exporting {type_name} {progress}{fqn}")
                 try:
                     ddl = plugin.get_ddl(cursor, fqn)
                     block = plugin.to_define_and_invocation(
