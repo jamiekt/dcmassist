@@ -40,6 +40,8 @@ def test_export_writes_full_layout(tmp_path: Path) -> None:
         fake_cursor._last_sql = sql
 
     def fetchall_side_effect():
+        if "SHOW SCHEMAS" in fake_cursor._last_sql:
+            return [{"name": "PUBLIC", "database_name": "MYDB"}]
         if "SHOW TABLES" in fake_cursor._last_sql:
             return [{"name": "T1", "schema_name": "PUBLIC"}]
         return []
@@ -86,6 +88,8 @@ def test_export_per_object_get_ddl_failure_continues(tmp_path: Path, capsys) -> 
             raise RuntimeError("permission denied")
 
     def fetchall_side_effect():
+        if "SHOW SCHEMAS" in fake_cursor._last_sql:
+            return [{"name": "PUBLIC", "database_name": "MYDB"}]
         if "SHOW TABLES" in fake_cursor._last_sql:
             return [
                 {"name": "T_OK", "schema_name": "PUBLIC"},
@@ -126,12 +130,15 @@ def test_export_no_objects_returns_4_when_errors(tmp_path: Path) -> None:
         if "GET_DDL" in sql:
             raise RuntimeError("denied")
 
+    def fetchall_side_effect():
+        if "SHOW SCHEMAS" in fake_cursor._last_sql:
+            return [{"name": "PUBLIC", "database_name": "MYDB"}]
+        if "SHOW TABLES" in fake_cursor._last_sql:
+            return [{"name": "T", "schema_name": "PUBLIC"}]
+        return []
+
     fake_cursor.execute.side_effect = execute_side_effect
-    fake_cursor.fetchall.side_effect = lambda: (
-        [{"name": "T", "schema_name": "PUBLIC"}]
-        if "SHOW TABLES" in fake_cursor._last_sql
-        else []
-    )
+    fake_cursor.fetchall.side_effect = fetchall_side_effect
     fake_cursor.fetchone.side_effect = lambda: None
 
     with patch("dcmexporter.orchestrator.open_connection") as oc:
