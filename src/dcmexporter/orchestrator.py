@@ -47,7 +47,12 @@ def export(cfg: Config) -> int:
 
             try:
                 status.update(f"discovering {type_name}s...")
-                fqns = plugin.discover(cursor, cfg.database, cfg.schemas or None)
+                fqns = plugin.discover(
+                    cursor,
+                    cfg.database,
+                    cfg.schemas or None,
+                    progress=status.update,
+                )
             except Exception as exc:  # noqa: BLE001
                 status.clear()
                 print(

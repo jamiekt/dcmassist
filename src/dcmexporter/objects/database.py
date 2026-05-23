@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from dcmexporter.objects._base import V1ObjectPlugin
+from dcmexporter.plugin import ProgressCallback
 from dcmexporter.types import FQN
 
 
@@ -31,7 +32,11 @@ class DatabasePlugin(V1ObjectPlugin):
     )
 
     def discover(
-        self, cursor: Any, database: str, schemas: tuple[str, ...] | None
+        self,
+        cursor: Any,
+        database: str,
+        schemas: tuple[str, ...] | None,
+        progress: ProgressCallback | None = None,
     ) -> list[FQN]:
         # Database is account-level: SHOW DATABASES has no IN DATABASE clause.
         # The --schema filter is meaningless here.

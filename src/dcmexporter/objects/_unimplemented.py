@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from dcmexporter.plugin import ObjectPlugin
+from dcmexporter.plugin import ObjectPlugin, ProgressCallback
 from dcmexporter.types import UNIMPLEMENTED_TYPES, FQN
 
 
@@ -18,7 +18,11 @@ class _UnimplementedPlugin(ObjectPlugin):
         self.file_slug = _slug(type_name)
 
     def discover(
-        self, cursor: Any, database: str, schemas: tuple[str, ...] | None
+        self,
+        cursor: Any,
+        database: str,
+        schemas: tuple[str, ...] | None,
+        progress: ProgressCallback | None = None,
     ) -> list[FQN]:
         raise NotImplementedError(
             f"{self.type_name} is in DCM's supported set but not yet implemented "

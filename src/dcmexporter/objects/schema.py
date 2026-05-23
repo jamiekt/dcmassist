@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from dcmexporter.objects._base import V1ObjectPlugin
+from dcmexporter.plugin import ProgressCallback
 from dcmexporter.types import FQN
 
 
@@ -27,7 +28,11 @@ class SchemaPlugin(V1ObjectPlugin):
     )
 
     def discover(
-        self, cursor: Any, database: str, schemas: tuple[str, ...] | None
+        self,
+        cursor: Any,
+        database: str,
+        schemas: tuple[str, ...] | None,
+        progress: ProgressCallback | None = None,
     ) -> list[FQN]:
         # SHOW SCHEMAS returns `name` (schema) and `database_name`; there is no
         # `schema_name`. The schema's FQN is db.schema.schema since the schema's
@@ -35,7 +40,11 @@ class SchemaPlugin(V1ObjectPlugin):
         rows: list[dict[str, Any]] = []
         if schemas:
             # Snowflake LIKE doesn't accept arbitrary lists; enumerate explicitly.
-            for name in schemas:
+            total = len(schemas)
+            for index, name in enumerate(schemas, start=1):
+                if progress is not None:
+                    count = f" {index}/{total}" if total > 1 else ""
+                    progress(f"discovering Schema{count} {database}.{name}")
                 cursor.execute(f"SHOW SCHEMAS LIKE '{name}' IN DATABASE {database}")
                 rows.extend(cursor.fetchall())
         else:

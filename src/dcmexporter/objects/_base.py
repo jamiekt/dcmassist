@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from dcmexporter.plugin import ObjectPlugin
+from dcmexporter.plugin import ObjectPlugin, ProgressCallback
 from dcmexporter.rewrite import (
     create_to_define,
     inject_comment_if_missing,
@@ -40,15 +40,23 @@ class V1ObjectPlugin(ObjectPlugin):
     MACRO_BODY: str = ""
 
     def discover(
-        self, cursor: Any, database: str, schemas: tuple[str, ...] | None
+        self,
+        cursor: Any,
+        database: str,
+        schemas: tuple[str, ...] | None,
+        progress: ProgressCallback | None = None,
     ) -> list[FQN]:
         if not self.SHOW_FORM:
             raise NotImplementedError(self.type_name)
 
-        target_schemas = self._target_schemas(cursor, database, schemas)
+        target_schemas = sorted(self._target_schemas(cursor, database, schemas))
+        total = len(target_schemas)
 
         rows: list[FQN] = []
-        for schema in sorted(target_schemas):
+        for index, schema in enumerate(target_schemas, start=1):
+            if progress is not None:
+                count = f" {index}/{total}" if total > 1 else ""
+                progress(f"discovering {self.type_name}s in{count} {database}.{schema}")
             cursor.execute(f"{self.SHOW_FORM} IN SCHEMA {database}.{schema}")
             rows.extend(self._rows_to_fqns(cursor.fetchall(), database))
         return sorted(rows, key=lambda f: (f.schema or "", f.name))
