@@ -12,7 +12,7 @@ from dcmexporter.makefile import render_makefile
 from dcmexporter.manifest import render_manifest
 from dcmexporter.objects import build_registry
 from dcmexporter.render import OutFolderError, prepare_out_folder, write_outputs
-from dcmexporter.status import StatusLine
+from dcmexporter.status import StatusDashboard
 from dcmexporter.types import V1_TYPES
 
 
@@ -20,7 +20,6 @@ def export(cfg: Config) -> int:
     registry = build_registry()
     account_identifier = ""
     conn: Any | None = None
-    status = StatusLine()
     log: RunLog | None = None
 
     try:
@@ -35,94 +34,101 @@ def export(cfg: Config) -> int:
         log = RunLog(cfg.out_folder / "dcmexporter.log")
         log.info(f"export starting database={cfg.database} out_folder={cfg.out_folder}")
 
-        status.update("connecting to Snowflake...")
-        conn = open_connection(cfg.connection)
-        account_identifier = resolve_account_identifier(conn)
-        cursor = conn.cursor()
-        log.info(f"connected to Snowflake account={account_identifier}")
+        with StatusDashboard(stream=sys.stderr) as status:
+            status.set_database(cfg.database)
+            status.set_now("connecting to Snowflake...")
+            conn = open_connection(cfg.connection)
+            account_identifier = resolve_account_identifier(conn)
+            cursor = conn.cursor()
+            log.info(f"connected to Snowflake account={account_identifier}")
 
-        type_names = filter_types(cfg)
-        definitions: dict[str, str] = {}
-        macros: dict[str, str] | None = {} if cfg.use_macros else None
+            type_names = filter_types(cfg)
+            definitions: dict[str, str] = {}
+            macros: dict[str, str] | None = {} if cfg.use_macros else None
 
-        exported = 0
-        errors = 0
-        skipped_missing = 0
-        for type_name in type_names:
-            if type_name not in V1_TYPES:
-                # known-supported but unimplemented -> skip silently
-                if not cfg.includes:
-                    status.clear()
-                    log.warn(f"skipping unsupported type: {type_name}")
-                    print(
-                        f"[dcmexporter] skipping unsupported type: {type_name}",
-                        file=sys.stderr,
-                    )
-                continue
-            plugin = registry.get(type_name)
-
-            try:
-                status.update(f"discovering {type_name}s...")
-                log.info(f"discovering {type_name}s")
-                fqns = plugin.discover(
-                    cursor,
-                    cfg.database,
-                    cfg.schemas or None,
-                    progress=status.update,
-                )
-                log.info(f"discovered {len(fqns)} {type_name}(s)")
-                for schema, count in _counts_by_schema(fqns):
-                    log.info(f"  {schema}: {count} {type_name}(s)")
-            except Exception as exc:  # noqa: BLE001
-                status.clear()
-                log.error(f"discover failed for {type_name}: {exc}")
-                print(
-                    f"[dcmexporter] discover failed for {type_name}: {exc}",
-                    file=sys.stderr,
-                )
-                errors += 1
-                continue
-
-            blocks: list[str] = []
-            total = len(fqns)
-            for index, fqn in enumerate(fqns, start=1):
-                progress = f"{index}/{total} " if total > 1 else ""
-                status.update(f"exporting {type_name} {progress}{fqn}")
-                try:
-                    ddl = plugin.get_ddl(cursor, fqn)
-                    block = plugin.to_define_and_invocation(
-                        ddl,
-                        comment=cfg.comment,
-                        use_macros=cfg.use_macros,
-                        database=cfg.database,
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    log.error(f"{type_name} {fqn}: {exc}")
-                    if _is_missing_or_unauthorized(exc):
-                        skipped_missing += 1
-                    else:
-                        errors += 1
+            exported = 0
+            errors = 0
+            skipped_missing = 0
+            for type_name in type_names:
+                if type_name not in V1_TYPES:
+                    if not cfg.includes:
+                        log.warn(f"skipping unsupported type: {type_name}")
+                        status.log(
+                            f"[dcmexporter] skipping unsupported type: {type_name}"
+                        )
                     continue
-                blocks.append(block)
-                exported += 1
+                plugin = registry.get(type_name)
 
-            definitions[plugin.file_slug] = "\n".join(blocks)
-            if macros is not None:
-                macros[plugin.file_slug] = plugin.macro_definition()
+                try:
+                    status.set_schema(f"discovering {type_name}s...")
+                    log.info(f"discovering {type_name}s")
+                    fqns = plugin.discover(
+                        cursor,
+                        cfg.database,
+                        cfg.schemas or None,
+                        progress=status.set_schema,
+                    )
+                    log.info(f"discovered {len(fqns)} {type_name}(s)")
+                    for schema, count in _counts_by_schema(fqns):
+                        log.info(f"  {schema}: {count} {type_name}(s)")
+                except Exception as exc:  # noqa: BLE001
+                    log.error(f"discover failed for {type_name}: {exc}")
+                    status.log(f"[dcmexporter] discover failed for {type_name}: {exc}")
+                    errors += 1
+                    status.set_counts(
+                        exported=exported, errors=errors, skipped=skipped_missing
+                    )
+                    continue
 
-        status.update("writing output files...")
-        log.info("writing output files")
-        manifest = render_manifest(cfg, account_identifier=account_identifier)
-        makefile = render_makefile(cfg)
-        write_outputs(
-            out_folder=cfg.out_folder,
-            manifest=manifest,
-            makefile=makefile,
-            definitions=definitions,
-            macros=macros,
-        )
+                blocks: list[str] = []
+                total = len(fqns)
+                for index, fqn in enumerate(fqns, start=1):
+                    progress = f"{index}/{total} " if total > 1 else ""
+                    status.set_now(f"{type_name} {progress}{fqn}")
+                    try:
+                        ddl = plugin.get_ddl(cursor, fqn)
+                        block = plugin.to_define_and_invocation(
+                            ddl,
+                            comment=cfg.comment,
+                            use_macros=cfg.use_macros,
+                            database=cfg.database,
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        log.error(f"{type_name} {fqn}: {exc}")
+                        if _is_missing_or_unauthorized(exc):
+                            skipped_missing += 1
+                        else:
+                            errors += 1
+                        status.set_counts(
+                            exported=exported,
+                            errors=errors,
+                            skipped=skipped_missing,
+                        )
+                        continue
+                    blocks.append(block)
+                    exported += 1
+                    status.set_counts(
+                        exported=exported,
+                        errors=errors,
+                        skipped=skipped_missing,
+                    )
 
-        status.clear()
+                definitions[plugin.file_slug] = "\n".join(blocks)
+                if macros is not None:
+                    macros[plugin.file_slug] = plugin.macro_definition()
+
+            status.set_now("writing output files...")
+            status.set_schema("")
+            log.info("writing output files")
+            manifest = render_manifest(cfg, account_identifier=account_identifier)
+            makefile = render_makefile(cfg)
+            write_outputs(
+                out_folder=cfg.out_folder,
+                manifest=manifest,
+                makefile=makefile,
+                definitions=definitions,
+                macros=macros,
+            )
 
         if cfg.templating_configuration_keys and cfg.configurations:
             keys = ", ".join(cfg.templating_configuration_keys)
@@ -146,7 +152,6 @@ def export(cfg: Config) -> int:
             return 4
         return 0
     finally:
-        status.clear()
         if log is not None:
             log.close()
         if conn is not None:
