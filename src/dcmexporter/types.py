@@ -9,7 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 V1_TYPES: tuple[str, ...] = (
-    "Database",
     "Schema",
     "Table",
     "View",
@@ -19,7 +18,12 @@ V1_TYPES: tuple[str, ...] = (
     "Tag",
 )
 
+# Database is intentionally NOT in V1_TYPES: DCM rejects DEFINE DATABASE for
+# the database the project lives in ("Project cannot manage its parent
+# database"). Treating it as unimplemented makes the type name still validate
+# but never produces a DEFINE block.
 UNIMPLEMENTED_TYPES: tuple[str, ...] = (
+    "Database",
     "Dynamic table",
     "Task",
     "Alert",

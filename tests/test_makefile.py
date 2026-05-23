@@ -51,3 +51,13 @@ def test_makefile_uses_real_tabs_for_recipes() -> None:
     out = render_makefile(_cfg())
     plan_recipe_lines = [line for line in out.splitlines() if "snow dcm plan" in line]
     assert plan_recipe_lines[0].startswith("\t")
+
+
+def test_makefile_plan_target_warns_about_parent_schema() -> None:
+    """The plan target prints a warning so users know to drop the DEFINE for
+    the schema their DCM project lives in (DCM rejects 'Project cannot manage
+    its parent schema' otherwise). dcmexporter doesn't know which schema that
+    is, so we can only nudge."""
+    out = render_makefile(_cfg())
+    assert "parent schema" in out
+    assert "DEFINE" in out
