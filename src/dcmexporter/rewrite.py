@@ -1,0 +1,70 @@
+"""AST-level rewriting helpers powered by sqlglot.
+
+All helpers operate on Snowflake-dialect SQL strings. Each helper is independently
+callable; plugins compose them in their `to_define_and_invocation` implementations.
+"""
+
+from __future__ import annotations
+
+import re
+
+import sqlglot
+from sqlglot import exp
+
+_DIALECT = "snowflake"
+
+
+def _parse(ddl: str) -> exp.Expr:
+    return sqlglot.parse_one(ddl, dialect=_DIALECT)
+
+
+def _render(node: exp.Expr) -> str:
+    return node.sql(dialect=_DIALECT)
+
+
+def create_to_define(ddl: str) -> str:
+    """Rewrite the leading `CREATE [OR REPLACE]` to `DEFINE`.
+
+    Idempotent: a string that already starts with DEFINE is returned unchanged.
+    Falls back to a regex rewrite if sqlglot can't parse the input.
+    """
+    stripped = ddl.lstrip()
+    if re.match(r"DEFINE\b", stripped, flags=re.IGNORECASE):
+        return ddl
+
+    pattern = re.compile(r"^(\s*)CREATE\s+(OR\s+REPLACE\s+)?", re.IGNORECASE)
+    match = pattern.match(ddl)
+    if match is None:
+        return ddl
+    return pattern.sub(rf"{match.group(1)}DEFINE ", ddl, count=1)
+
+
+_COMMENT_RE = re.compile(r"\bCOMMENT\s*=\s*", re.IGNORECASE)
+
+
+def inject_comment_if_missing(
+    ddl: str,
+    *,
+    comment: str | None,
+    supports_comment: bool = True,
+) -> str:
+    """Append `COMMENT='<comment>'` to the DEFINE statement when no COMMENT exists.
+
+    - If the type does not support COMMENT (`supports_comment=False`), returns `ddl`.
+    - If the existing DDL already has a COMMENT clause, returns `ddl`.
+    - If `comment is None`, returns `ddl`.
+    - Single quotes inside the comment are doubled (Snowflake string escape).
+    """
+    if not supports_comment or comment is None:
+        return ddl
+    if _COMMENT_RE.search(ddl):
+        return ddl
+
+    escaped = comment.replace("'", "''")
+    body = ddl.rstrip()
+    if body.endswith(";"):
+        body = body[:-1].rstrip()
+        suffix = ";"
+    else:
+        suffix = ""
+    return f"{body} COMMENT='{escaped}'{suffix}"
