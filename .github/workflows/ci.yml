@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: "Text to prepend to the GitHub release notes"
+        required: false
+        default: ""
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras --python ${{ matrix.python-version }}
+
+      - name: Ruff format
+        run: uv run --python ${{ matrix.python-version }} ruff format --check src/ tests/
+
+      - name: Ruff check
+        run: uv run --python ${{ matrix.python-version }} ruff check src/ tests/
+
+      - name: Run tests
+        run: uv run --python ${{ matrix.python-version }} pytest tests/ -v
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.stamp.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Stamp version
+        id: stamp
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          python - <<'PY'
+          import os, re, pathlib
+          path = pathlib.Path("pyproject.toml")
+          text = path.read_text()
+          match = re.search(r'^version = "(\d+\.\d+)"', text, re.MULTILINE)
+          if not match:
+              raise SystemExit("pyproject.toml must contain 'version = \"MAJOR.MINOR\"'")
+          base = match.group(1)
+          full = f'{base}.{os.environ["RUN_NUMBER"]}'
+          path.write_text(
+              re.sub(
+                  r'^version = "\d+\.\d+"',
+                  f'version = "{full}"',
+                  text,
+                  count=1,
+                  flags=re.MULTILINE,
+              )
+          )
+          print(f"Stamped version: {full}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+              fh.write(f"version={full}\n")
+          PY
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  release:
+    needs: [build, publish]
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+        run: |
+          pypi_line="Published to PyPI: https://pypi.org/project/dcmexporter/${VERSION}/"
+          if [ -n "${RELEASE_NOTES}" ]; then
+            notes="${RELEASE_NOTES}"$'\n\n'"${pypi_line}"
+          else
+            notes="${pypi_line}"
+          fi
+          gh release create "v${VERSION}" \
+            --target "${GITHUB_SHA}" \
+            --title "v${VERSION}" \
+            --notes "${notes}" \
+            dist/*
