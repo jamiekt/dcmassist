@@ -71,6 +71,8 @@ def export(cfg: Config) -> int:
                     progress=status.update,
                 )
                 log.info(f"discovered {len(fqns)} {type_name}(s)")
+                for schema, count in _counts_by_schema(fqns):
+                    log.info(f"  {schema}: {count} {type_name}(s)")
             except Exception as exc:  # noqa: BLE001
                 status.clear()
                 log.error(f"discover failed for {type_name}: {exc}")
@@ -152,6 +154,19 @@ def export(cfg: Config) -> int:
                 conn.close()
             except Exception:  # noqa: BLE001
                 pass
+
+
+def _counts_by_schema(fqns: list[Any]) -> list[tuple[str, int]]:
+    """Group discovered FQNs by schema name and return (schema, count) sorted by schema.
+
+    Database-level objects (schema is None) bucket under '<database>' so the
+    log breakdown still accounts for them.
+    """
+    counts: dict[str, int] = {}
+    for fqn in fqns:
+        key = fqn.schema if fqn.schema else f"<{fqn.database}>"
+        counts[key] = counts.get(key, 0) + 1
+    return sorted(counts.items())
 
 
 def _is_missing_or_unauthorized(exc: BaseException) -> bool:
