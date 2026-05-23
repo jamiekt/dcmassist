@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from dcmexporter.objects._base import V1ObjectPlugin
+from dcmexporter.plugin import ProgressCallback
 from dcmexporter.types import FQN
 
 
@@ -31,7 +32,11 @@ class WarehousePlugin(V1ObjectPlugin):
     )
 
     def discover(
-        self, cursor: Any, database: str, schemas: tuple[str, ...] | None
+        self,
+        cursor: Any,
+        database: str,
+        schemas: tuple[str, ...] | None,
+        progress: ProgressCallback | None = None,
     ) -> list[FQN]:
         # Warehouses are account-level; the schemas filter is meaningless here.
         cursor.execute("SHOW WAREHOUSES")

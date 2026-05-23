@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 from dcmexporter.types import DCM_TYPES, FQN
+
+ProgressCallback = Callable[[str], None]
 
 
 class ObjectPlugin(ABC):
@@ -14,7 +16,11 @@ class ObjectPlugin(ABC):
 
     @abstractmethod
     def discover(
-        self, cursor: Any, database: str, schemas: tuple[str, ...] | None
+        self,
+        cursor: Any,
+        database: str,
+        schemas: tuple[str, ...] | None,
+        progress: ProgressCallback | None = None,
     ) -> list[FQN]: ...
 
     @abstractmethod
