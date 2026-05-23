@@ -114,8 +114,10 @@ class V1ObjectPlugin(ObjectPlugin):
     def get_ddl(self, cursor: Any, fqn: FQN) -> str:
         # Pass the quoted FQN literal so non-uppercase / digit-leading / quoted
         # identifiers resolve correctly. GET_DDL's second arg is a SQL string,
-        # so we wrap the quoted identifier in single quotes.
-        cursor.execute(f"SELECT GET_DDL('{self.GET_DDL_TYPE}', '{fqn.quoted}')")
+        # so we wrap the quoted identifier in single quotes. The third arg
+        # `TRUE` returns a fully-qualified DDL — DCM rejects unqualified names
+        # in DEFINE blocks ("Unqualified name: 'X' detected for: 'Table'").
+        cursor.execute(f"SELECT GET_DDL('{self.GET_DDL_TYPE}', '{fqn.quoted}', TRUE)")
         row = cursor.fetchone()
         if isinstance(row, dict):
             return next(iter(row.values()))
