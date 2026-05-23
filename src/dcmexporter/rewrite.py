@@ -26,7 +26,8 @@ def create_to_define(ddl: str) -> str:
     """Rewrite the leading `CREATE [OR REPLACE]` to `DEFINE`.
 
     Idempotent: a string that already starts with DEFINE is returned unchanged.
-    Falls back to a regex rewrite if sqlglot can't parse the input.
+    A regex rewrite is used (rather than sqlglot) so that GET_DDL output containing
+    Snowflake-specific syntax sqlglot can't parse still rewrites cleanly.
     """
     stripped = ddl.lstrip()
     if re.match(r"DEFINE\b", stripped, flags=re.IGNORECASE):
