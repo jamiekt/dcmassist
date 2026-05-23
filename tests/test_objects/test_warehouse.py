@@ -12,17 +12,25 @@ from dcmexporter.types import FQN
 
 def test_discover_uses_show_warehouses() -> None:
     cursor = MagicMock()
-    cursor.fetchall.return_value = [{"name": "W1"}, {"name": "W2"}]
+    sql_log: list[str] = []
+    cursor.execute.side_effect = lambda sql: sql_log.append(sql)
+    cursor.fetchall.return_value = [
+        {"name": "WH1", "state": "STARTED"},
+        {"name": "WH2", "state": "SUSPENDED"},
+    ]
     out = plugin.discover(cursor, "MYDB", None)
-    cursor.execute.assert_called_once_with("SHOW WAREHOUSES")
-    assert [str(f) for f in out] == ["W1", "W2"]
+    assert sql_log == ["SHOW WAREHOUSES"]
+    assert [str(f) for f in out] == ["WH1", "WH2"]
 
 
-def test_discover_filters_by_schema() -> None:
+def test_discover_ignores_schemas_argument() -> None:
+    """Warehouse is account-level; schemas filter has no effect."""
     cursor = MagicMock()
-    cursor.fetchall.return_value = [{"name": "W"}]
-    plugin.discover(cursor, "MYDB", ("S",))
-    cursor.execute.assert_called_once_with("SHOW WAREHOUSES")
+    sql_log: list[str] = []
+    cursor.execute.side_effect = lambda sql: sql_log.append(sql)
+    cursor.fetchall.return_value = [{"name": "WH1"}]
+    plugin.discover(cursor, "MYDB", ("ANY",))
+    assert sql_log == ["SHOW WAREHOUSES"]
 
 
 def test_get_ddl_calls_get_ddl_function() -> None:
