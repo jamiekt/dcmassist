@@ -1,0 +1,56 @@
+[project]
+name = "dcmexporter"
+version = "0.1"
+description = "Export Snowflake object definitions for use in a DCM project"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Database",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "click>=8.1",
+    "snowflake-connector-python>=3.7",
+    "pyyaml>=6.0",
+    "sqlglot>=25.0",
+    "jinja2>=3.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/jamiekt/dcmexporter"
+Repository = "https://github.com/jamiekt/dcmexporter"
+Issues = "https://github.com/jamiekt/dcmexporter/issues"
+
+[project.scripts]
+dcmexporter = "dcmexporter.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.mypy]
+python_version = "3.12"
+
+[[tool.mypy.overrides]]
+module = ["snowflake.*", "yaml", "sqlglot.*", "jinja2.*"]
+ignore_missing_imports = true
+
+[dependency-groups]
+dev = [
+    "mypy>=1.11",
+    "pre-commit>=4.0",
+    "pytest>=8.0",
+    "ruff>=0.8",
+]
