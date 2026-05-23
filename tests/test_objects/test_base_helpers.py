@@ -58,9 +58,9 @@ def test_discover_iterates_schemas_when_no_filter() -> None:
     out = plugin.discover(cursor, "MYDB", None)
 
     assert sql_log == [
-        "SHOW SCHEMAS IN DATABASE MYDB",
-        "SHOW THINGS IN SCHEMA MYDB.ANALYTICS",
-        "SHOW THINGS IN SCHEMA MYDB.PUBLIC",
+        "SHOW SCHEMAS IN DATABASE MYDB LIMIT 10000",
+        "SHOW THINGS IN SCHEMA MYDB.ANALYTICS LIMIT 10000",
+        "SHOW THINGS IN SCHEMA MYDB.PUBLIC LIMIT 10000",
     ]
     assert [str(f) for f in out] == ["MYDB.ANALYTICS.T2", "MYDB.PUBLIC.T1"]
 
@@ -80,5 +80,5 @@ def test_discover_with_schemas_filter_skips_schema_listing() -> None:
     plugin = _MinimalPlugin()
     out = plugin.discover(cursor, "MYDB", ("S",))
 
-    assert sql_log == ["SHOW THINGS IN SCHEMA MYDB.S"]
+    assert sql_log == ["SHOW THINGS IN SCHEMA MYDB.S LIMIT 10000"]
     assert [str(f) for f in out] == ["MYDB.S.T"]

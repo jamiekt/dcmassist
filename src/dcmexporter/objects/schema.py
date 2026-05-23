@@ -9,6 +9,7 @@ from dcmexporter.objects._schema_ddl import (
     SchemaNotExportable,
     synthesize_schema_ddl,
 )
+from dcmexporter.objects._show_paging import paginated_show
 from dcmexporter.plugin import ProgressCallback
 from dcmexporter.types import FQN
 
@@ -54,10 +55,8 @@ class SchemaPlugin(V1ObjectPlugin):
                 cursor.execute(f"SHOW SCHEMAS LIKE '{name}' IN DATABASE {database}")
                 rows.extend(cursor.fetchall())
         else:
-            cursor.execute(f"SHOW SCHEMAS IN DATABASE {database}")
-            rows.extend(
-                row for row in cursor.fetchall() if row["name"] != "INFORMATION_SCHEMA"
-            )
+            page_rows = paginated_show(cursor, f"SHOW SCHEMAS IN DATABASE {database}")
+            rows.extend(row for row in page_rows if row["name"] != "INFORMATION_SCHEMA")
 
         out = [
             FQN(database=database, schema=row["name"], name=row["name"]) for row in rows
