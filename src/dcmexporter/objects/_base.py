@@ -83,8 +83,8 @@ class V1ObjectPlugin(ObjectPlugin):
         """Convert DictCursor rows into FQNs.
 
         Snowflake's `SHOW <type> IN [DATABASE|SCHEMA]` returns rows with `name` and,
-        for per-schema types, `schema_name`. Account-level types (Database, Warehouse)
-        have no `schema_name` and use `schema=None`.
+        for per-schema types, `schema_name`. The Database object is account-level
+        and uses `schema=None`.
         """
         out: list[FQN] = []
         for row in rows:
