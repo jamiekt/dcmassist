@@ -76,6 +76,18 @@ def test_log_writes_above_panel(monkeypatch) -> None:
     assert "discover failed for Tag" in stream.getvalue()
 
 
+def test_log_writes_to_stream_when_disabled(monkeypatch) -> None:
+    """When the dashboard is disabled (non-TTY etc.) we still want warnings
+    and errors to surface in piped/CI output. log() should fall back to
+    writing the message directly to the stream rather than dropping it."""
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.delenv("DCMEXPORTER_NO_STATUS", raising=False)
+    stream = io.StringIO()
+    with StatusDashboard(stream=stream) as dash:
+        dash.log("[dcmexporter] discover failed for Tag: <reason>")
+    assert "discover failed for Tag" in stream.getvalue()
+
+
 def test_setters_safe_before_enter() -> None:
     """Calling setters on an unentered dashboard must not raise. Useful so
     callers can construct the dashboard and update fields conditionally."""

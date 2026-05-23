@@ -10,6 +10,7 @@ print as normal lines (use ``.log()`` to write above the panel).
 from __future__ import annotations
 
 import os
+import sys
 from types import TracebackType
 from typing import IO
 
@@ -94,11 +95,15 @@ class StatusDashboard:
         """Write a one-shot line that scrolls above the live panel.
 
         Use for warnings/errors that would otherwise be overwritten by the
-        next refresh. No-op when the dashboard is disabled.
+        next refresh. When the dashboard is disabled (non-TTY, NO_COLOR, or
+        DCMEXPORTER_NO_STATUS=1) the message still reaches stderr-equivalent
+        output so CI/piped runs don't silently lose warnings.
         """
-        if self._console is None:
+        if self._console is not None:
+            self._console.log(message)
             return
-        self._console.log(message)
+        target = self._stream if self._stream is not None else sys.stderr
+        print(message, file=target)
 
     # --- internals ---------------------------------------------------------
 
