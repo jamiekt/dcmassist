@@ -36,8 +36,9 @@ class StagePlugin(V1ObjectPlugin):
     def get_ddl(self, cursor: Any, fqn: FQN) -> str:
         # Snowflake doesn't support GET_DDL('STAGE',...). Read DESC STAGE rows
         # and synthesize a minimal CREATE OR REPLACE STAGE — see _stage_ddl.py
-        # for why credentials are deliberately omitted.
-        cursor.execute(f"DESC STAGE {fqn}")
+        # for why credentials are deliberately omitted. Use the quoted FQN so
+        # non-standard identifiers resolve.
+        cursor.execute(f"DESC STAGE {fqn.quoted}")
         return synthesize_stage_ddl(fqn, cursor.fetchall())
 
 

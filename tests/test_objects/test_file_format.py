@@ -53,7 +53,7 @@ def test_get_ddl_calls_get_ddl_function() -> None:
     fqn = FQN("MYDB", "PUBLIC", "FF")
     out = plugin.get_ddl(cursor, fqn)
     cursor.execute.assert_called_once_with(
-        "SELECT GET_DDL('FILE_FORMAT', 'MYDB.PUBLIC.FF')"
+        'SELECT GET_DDL(\'FILE_FORMAT\', \'"MYDB"."PUBLIC"."FF"\')'
     )
     assert out.startswith("CREATE")
 
