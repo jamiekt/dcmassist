@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from dcmexporter.objects._base import V1ObjectPlugin
+from dcmexporter.objects._stage_ddl import synthesize_stage_ddl
+from dcmexporter.types import FQN
 
 
 class StagePlugin(V1ObjectPlugin):
     type_name = "Stage"
     file_slug = "stage"
     SHOW_FORM = "SHOW STAGES"
+    # GET_DDL_TYPE retained for symmetry with siblings, but unused: Snowflake does
+    # not support GET_DDL('STAGE', ...). See get_ddl override + _stage_ddl.py.
     GET_DDL_TYPE = "STAGE"
     SUPPORTS_COMMENT = True
     MACRO_BODY = (
@@ -26,6 +32,13 @@ class StagePlugin(V1ObjectPlugin):
         "{%- endif %}\n"
         "{% endmacro %}\n"
     )
+
+    def get_ddl(self, cursor: Any, fqn: FQN) -> str:
+        # Snowflake doesn't support GET_DDL('STAGE',...). Read DESC STAGE rows
+        # and synthesize a minimal CREATE OR REPLACE STAGE — see _stage_ddl.py
+        # for why credentials are deliberately omitted.
+        cursor.execute(f"DESC STAGE {fqn}")
+        return synthesize_stage_ddl(fqn, cursor.fetchall())
 
 
 plugin = StagePlugin()

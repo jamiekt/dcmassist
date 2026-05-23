@@ -45,18 +45,43 @@ def test_discover_filters_by_schema() -> None:
     assert [str(f) for f in out] == ["MYDB.S.ST"]
 
 
-def test_get_ddl_calls_get_ddl_function() -> None:
+def test_get_ddl_uses_desc_stage_and_synthesizer() -> None:
+    """Stage uses DESC STAGE + synthesizer; GET_DDL('STAGE',...) is unsupported."""
     cursor = MagicMock()
-    cursor.fetchone.return_value = ["CREATE OR REPLACE STAGE MYDB.PUBLIC.ST"]
-    fqn = FQN("MYDB", "PUBLIC", "ST")
+    sql_log: list[str] = []
+    cursor.execute.side_effect = lambda sql: sql_log.append(sql)
+    cursor.fetchall.return_value = [
+        {
+            "parent_property": "STAGE_LOCATION",
+            "property": "URL",
+            "property_value": '["s3://bucket/x/"]',
+            "property_type": "String",
+            "property_default": "",
+        },
+        {
+            "parent_property": "STAGE_INTEGRATION",
+            "property": "STORAGE_INTEGRATION",
+            "property_value": "MY_INT",
+            "property_type": "String",
+            "property_default": "",
+        },
+    ]
+    fqn = FQN("MYDB", "PUBLIC", "S")
     out = plugin.get_ddl(cursor, fqn)
-    cursor.execute.assert_called_once_with("SELECT GET_DDL('STAGE', 'MYDB.PUBLIC.ST')")
-    assert out.startswith("CREATE")
+    assert sql_log == ["DESC STAGE MYDB.PUBLIC.S"]
+    assert "CREATE OR REPLACE STAGE MYDB.PUBLIC.S" in out
+    assert "STORAGE_INTEGRATION = MY_INT" in out
 
 
 def test_to_define_and_invocation_macro_mode() -> None:
+    ddl = (
+        "CREATE OR REPLACE STAGE MYDB.PUBLIC.S\n"
+        "  URL = 's3://bucket/x/'\n"
+        "  STORAGE_INTEGRATION = MY_INT\n"
+        ";"
+    )
     out = plugin.to_define_and_invocation(
-        "CREATE OR REPLACE STAGE MYDB.PUBLIC.ST",
+        ddl,
         comment="hi",
         use_macros=True,
         database="MYDB",
@@ -66,14 +91,20 @@ def test_to_define_and_invocation_macro_mode() -> None:
 
 
 def test_to_define_and_invocation_raw_mode() -> None:
+    ddl = (
+        "CREATE OR REPLACE STAGE MYDB.PUBLIC.S\n"
+        "  URL = 's3://bucket/x/'\n"
+        "  STORAGE_INTEGRATION = MY_INT\n"
+        ";"
+    )
     out = plugin.to_define_and_invocation(
-        "CREATE OR REPLACE STAGE MYDB.PUBLIC.ST",
+        ddl,
         comment=None,
         use_macros=False,
         database="MYDB",
     )
     assert out.upper().startswith("DEFINE STAGE")
-    assert "{{ database }}.PUBLIC.ST" in out
+    assert "{{ database }}.PUBLIC.S" in out
 
 
 def test_macro_definition_is_valid_jinja() -> None:
