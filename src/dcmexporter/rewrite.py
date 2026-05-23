@@ -1,7 +1,8 @@
-"""AST-level rewriting helpers powered by sqlglot.
+"""DDL rewriting helpers for the GET_DDL → DEFINE pipeline.
 
-All helpers operate on Snowflake-dialect SQL strings. Each helper is independently
-callable; plugins compose them in their `to_define_and_invocation` implementations.
+Helpers are regex-based so they tolerate Snowflake-specific syntax that sqlglot
+can't parse. Each helper is independently callable; plugins compose them in their
+`to_define_and_invocation` implementations.
 """
 
 from __future__ import annotations
