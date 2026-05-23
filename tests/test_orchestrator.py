@@ -41,8 +41,16 @@ def test_export_writes_full_layout(tmp_path: Path) -> None:
 
     def fetchall_side_effect():
         if "SHOW SCHEMAS" in fake_cursor._last_sql:
-            return [{"name": "PUBLIC", "database_name": "MYDB"}]
+            return [
+                {"name": "PUBLIC", "database_name": "MYDB"},
+                {"name": "ANALYTICS", "database_name": "MYDB"},
+            ]
         if "SHOW TABLES" in fake_cursor._last_sql:
+            if "ANALYTICS" in fake_cursor._last_sql:
+                return [
+                    {"name": "T2", "schema_name": "ANALYTICS"},
+                    {"name": "T3", "schema_name": "ANALYTICS"},
+                ]
             return [{"name": "T1", "schema_name": "PUBLIC"}]
         return []
 
@@ -64,6 +72,10 @@ def test_export_writes_full_layout(tmp_path: Path) -> None:
     assert (out / "Makefile").exists()
     assert (out / "sources" / "definitions" / "table.sql").exists()
     assert (out / "sources" / "macros" / "table.sql").exists()
+
+    log_text = (out / "dcmexporter.log").read_text()
+    assert "ANALYTICS: 2" in log_text
+    assert "PUBLIC: 1" in log_text
 
     table_sql = (out / "sources" / "definitions" / "table.sql").read_text()
     assert "{{ define_table(" in table_sql
