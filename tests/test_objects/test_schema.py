@@ -45,15 +45,25 @@ def test_discover_filters_with_like_per_schema() -> None:
     assert [str(f) for f in out] == ["MYDB.S1.S1", "MYDB.S2.S2"]
 
 
-def test_get_ddl_calls_get_ddl_function() -> None:
+def test_get_ddl_synthesizes_from_show_schemas() -> None:
+    """get_ddl uses SHOW SCHEMAS (not recursive GET_DDL) to build CREATE."""
     cursor = MagicMock()
-    cursor.fetchone.return_value = ["CREATE OR REPLACE SCHEMA MYDB.PUBLIC"]
+    cursor.execute.return_value = None
+    cursor.fetchall.return_value = [
+        {
+            "name": "PUBLIC",
+            "database_name": "MYDB",
+            "comment": "the schema",
+            "options": "",
+        }
+    ]
     fqn = FQN("MYDB", "PUBLIC", "PUBLIC")
     out = plugin.get_ddl(cursor, fqn)
     cursor.execute.assert_called_once_with(
-        "SELECT GET_DDL('SCHEMA', 'MYDB.PUBLIC.PUBLIC')"
+        "SHOW SCHEMAS LIKE 'PUBLIC' IN DATABASE MYDB"
     )
-    assert out.startswith("CREATE")
+    assert out.startswith("CREATE OR REPLACE SCHEMA MYDB.PUBLIC")
+    assert "COMMENT='the schema'" in out
 
 
 def test_to_define_and_invocation_macro_mode() -> None:
