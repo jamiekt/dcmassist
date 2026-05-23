@@ -113,6 +113,6 @@ def test_validate_config_normalises_includes() -> None:
 
 
 def test_validate_config_normalises_excludes() -> None:
-    cfg = _base_config(excludes=("warehouse",))
+    cfg = _base_config(excludes=("sequence",))
     validated = validate_config(cfg)
-    assert validated.excludes == ("Warehouse",)
+    assert validated.excludes == ("Sequence",)

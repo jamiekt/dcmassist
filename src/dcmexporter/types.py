@@ -17,7 +17,6 @@ V1_TYPES: tuple[str, ...] = (
     "Stage",
     "File format",
     "Tag",
-    "Warehouse",
 )
 
 UNIMPLEMENTED_TYPES: tuple[str, ...] = (

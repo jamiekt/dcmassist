@@ -29,7 +29,6 @@ def test_v1_types_match_spec() -> None:
         "Stage",
         "File format",
         "Tag",
-        "Warehouse",
     )
 
 
