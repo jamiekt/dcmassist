@@ -5,6 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from dcmexporter.objects._base import V1ObjectPlugin
+from dcmexporter.objects._schema_ddl import (
+    SchemaNotExportable,
+    synthesize_schema_ddl,
+)
 from dcmexporter.plugin import ProgressCallback
 from dcmexporter.types import FQN
 
@@ -13,6 +17,8 @@ class SchemaPlugin(V1ObjectPlugin):
     type_name = "Schema"
     file_slug = "schema"
     SHOW_FORM = "SHOW SCHEMAS"
+    # GET_DDL_TYPE retained for symmetry; unused. GET_DDL('SCHEMA', ...) is
+    # recursive and unworkable on busy schemas — see _schema_ddl.py.
     GET_DDL_TYPE = "SCHEMA"
     SUPPORTS_COMMENT = True
     MACRO_BODY = (
@@ -57,6 +63,17 @@ class SchemaPlugin(V1ObjectPlugin):
             FQN(database=database, schema=row["name"], name=row["name"]) for row in rows
         ]
         return sorted(out, key=lambda f: f.name)
+
+    def get_ddl(self, cursor: Any, fqn: FQN) -> str:
+        # Synthesize from SHOW rather than GET_DDL: GET_DDL('SCHEMA', ...) is
+        # recursive over every contained object. See _schema_ddl.py.
+        cursor.execute(f"SHOW SCHEMAS LIKE '{fqn.name}' IN DATABASE {fqn.database}")
+        rows = cursor.fetchall()
+        if not rows:
+            raise SchemaNotExportable(
+                f"schema {fqn}: SHOW SCHEMAS LIKE returned no rows"
+            )
+        return synthesize_schema_ddl(fqn, rows[0])
 
 
 plugin = SchemaPlugin()
