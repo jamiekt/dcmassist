@@ -54,19 +54,27 @@ class V1ObjectPlugin(ObjectPlugin):
             rows.extend(self._rows_to_fqns(cursor.fetchall(), database))
         return sorted(rows, key=lambda f: (f.schema or "", f.name))
 
-    def _rows_to_fqns(self, rows: list[tuple[Any, ...]], database: str) -> list[FQN]:
-        """SHOW returns (created_on, name, database, schema, …) by default for most types."""
+    def _rows_to_fqns(self, rows: list[dict[str, Any]], database: str) -> list[FQN]:
+        """Convert DictCursor rows into FQNs.
+
+        Snowflake's `SHOW <type> IN [DATABASE|SCHEMA]` returns rows with `name` and,
+        for per-schema types, `schema_name`. Account-level types (Database, Warehouse)
+        have no `schema_name` and use `schema=None`.
+        """
         out: list[FQN] = []
         for row in rows:
-            # Snowflake's SHOW returns dict-like rows when configured; we accept both.
-            if isinstance(row, dict):
-                schema = row.get("schema_name") or row.get("schema") or None
-                name = row["name"]
-            else:
-                # Tuple form: position 1 is name, position 2 is database, position 3 is schema.
-                name = row[1]
-                schema = row[3] if len(row) > 3 else None
-            out.append(FQN(database=database, schema=schema, name=name))
+            if not isinstance(row, dict):
+                raise TypeError(
+                    f"{self.type_name} discover received a non-dict row "
+                    f"({type(row).__name__}); cursor must be a DictCursor"
+                )
+            out.append(
+                FQN(
+                    database=database,
+                    schema=row.get("schema_name"),
+                    name=row["name"],
+                )
+            )
         return out
 
     def get_ddl(self, cursor: Any, fqn: FQN) -> str:
