@@ -52,3 +52,28 @@ def test_resolve_account_identifier_returns_attribute() -> None:
 def test_resolve_account_identifier_returns_empty_when_missing() -> None:
     conn = MagicMock(spec=[])  # no `account` attribute
     assert resolve_account_identifier(conn) == ""
+
+
+def test_open_connection_yields_dict_cursor(monkeypatch) -> None:
+    """The connection wrapper must return DictCursor by default so plugins receive
+    dict rows keyed by Snowflake column names. See plan: 2026-05-23-real-snowflake-discovery-fixes."""
+    captured: dict = {}
+
+    class FakeCursor:
+        pass
+
+    class FakeConn:
+        def cursor(self, cursor_class=None):
+            captured["cursor_class"] = cursor_class
+            return FakeCursor()
+
+    monkeypatch.setattr(
+        "dcmexporter.connection.snowflake_connect", lambda **_: FakeConn()
+    )
+
+    from dcmexporter.connection import open_connection
+    from snowflake.connector import DictCursor
+
+    conn = open_connection(None)
+    conn.cursor()  # plugins call cursor() — wrapper must inject DictCursor
+    assert captured["cursor_class"] is DictCursor
