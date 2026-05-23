@@ -7,10 +7,11 @@ from typing import Any
 
 from dcmexporter.config import Config, filter_types
 from dcmexporter.connection import open_connection, resolve_account_identifier
+from dcmexporter.log import RunLog
 from dcmexporter.makefile import render_makefile
 from dcmexporter.manifest import render_manifest
 from dcmexporter.objects import build_registry
-from dcmexporter.render import OutFolderError, write_outputs
+from dcmexporter.render import OutFolderError, prepare_out_folder, write_outputs
 from dcmexporter.status import StatusLine
 from dcmexporter.types import V1_TYPES
 
@@ -20,12 +21,25 @@ def export(cfg: Config) -> int:
     account_identifier = ""
     conn: Any | None = None
     status = StatusLine()
+    log: RunLog | None = None
 
     try:
+        # Prepare the output folder before opening the log so the log file
+        # itself isn't blown away by --force later.
+        try:
+            prepare_out_folder(cfg.out_folder, force=cfg.force)
+        except OutFolderError as exc:
+            print(f"[dcmexporter] {exc}", file=sys.stderr)
+            return 5
+
+        log = RunLog(cfg.out_folder / "dcmexporter.log")
+        log.info(f"export starting database={cfg.database} out_folder={cfg.out_folder}")
+
         status.update("connecting to Snowflake...")
         conn = open_connection(cfg.connection)
         account_identifier = resolve_account_identifier(conn)
         cursor = conn.cursor()
+        log.info(f"connected to Snowflake account={account_identifier}")
 
         type_names = filter_types(cfg)
         definitions: dict[str, str] = {}
@@ -33,11 +47,13 @@ def export(cfg: Config) -> int:
 
         exported = 0
         errors = 0
+        skipped_missing = 0
         for type_name in type_names:
             if type_name not in V1_TYPES:
                 # known-supported but unimplemented -> skip silently
                 if not cfg.includes:
                     status.clear()
+                    log.warn(f"skipping unsupported type: {type_name}")
                     print(
                         f"[dcmexporter] skipping unsupported type: {type_name}",
                         file=sys.stderr,
@@ -47,14 +63,17 @@ def export(cfg: Config) -> int:
 
             try:
                 status.update(f"discovering {type_name}s...")
+                log.info(f"discovering {type_name}s")
                 fqns = plugin.discover(
                     cursor,
                     cfg.database,
                     cfg.schemas or None,
                     progress=status.update,
                 )
+                log.info(f"discovered {len(fqns)} {type_name}(s)")
             except Exception as exc:  # noqa: BLE001
                 status.clear()
+                log.error(f"discover failed for {type_name}: {exc}")
                 print(
                     f"[dcmexporter] discover failed for {type_name}: {exc}",
                     file=sys.stderr,
@@ -76,12 +95,11 @@ def export(cfg: Config) -> int:
                         database=cfg.database,
                     )
                 except Exception as exc:  # noqa: BLE001
-                    status.clear()
-                    print(
-                        f"[dcmexporter] type={type_name} fqn={fqn} error={exc}",
-                        file=sys.stderr,
-                    )
-                    errors += 1
+                    log.error(f"{type_name} {fqn}: {exc}")
+                    if _is_missing_or_unauthorized(exc):
+                        skipped_missing += 1
+                    else:
+                        errors += 1
                     continue
                 blocks.append(block)
                 exported += 1
@@ -91,21 +109,16 @@ def export(cfg: Config) -> int:
                 macros[plugin.file_slug] = plugin.macro_definition()
 
         status.update("writing output files...")
+        log.info("writing output files")
         manifest = render_manifest(cfg, account_identifier=account_identifier)
         makefile = render_makefile(cfg)
-        try:
-            write_outputs(
-                out_folder=cfg.out_folder,
-                manifest=manifest,
-                makefile=makefile,
-                definitions=definitions,
-                macros=macros,
-                force=cfg.force,
-            )
-        except OutFolderError as exc:
-            status.clear()
-            print(f"[dcmexporter] {exc}", file=sys.stderr)
-            return 5
+        write_outputs(
+            out_folder=cfg.out_folder,
+            manifest=manifest,
+            makefile=makefile,
+            definitions=definitions,
+            macros=macros,
+        )
 
         status.clear()
 
@@ -117,18 +130,35 @@ def export(cfg: Config) -> int:
                 file=sys.stderr,
             )
 
-        print(
-            f"[dcmexporter] exported={exported} errors={errors}",
-            file=sys.stderr,
+        log.info(
+            f"export finished exported={exported} errors={errors} "
+            f"skipped_missing={skipped_missing}"
         )
+        summary = f"[dcmexporter] exported={exported} errors={errors}"
+        if skipped_missing:
+            summary += f" skipped_missing={skipped_missing}"
+        summary += f" log={log.path}"
+        print(summary, file=sys.stderr)
 
         if exported == 0 and errors > 0:
             return 4
         return 0
     finally:
         status.clear()
+        if log is not None:
+            log.close()
         if conn is not None:
             try:
                 conn.close()
             except Exception:  # noqa: BLE001
                 pass
+
+
+def _is_missing_or_unauthorized(exc: BaseException) -> bool:
+    """True for the very common Snowflake error 002003: object missing or
+    insufficient privileges. We treat this as a non-fatal skip so a couple of
+    inaccessible objects don't tank the whole export."""
+    text = str(exc)
+    if "002003" in text:
+        return True
+    return "does not exist or not authorized" in text.lower()

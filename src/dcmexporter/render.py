@@ -14,18 +14,12 @@ def _is_nonempty_dir(path: Path) -> bool:
     return path.exists() and path.is_dir() and any(path.iterdir())
 
 
-def write_outputs(
-    *,
-    out_folder: Path,
-    manifest: str,
-    makefile: str,
-    definitions: dict[str, str],
-    macros: dict[str, str] | None,
-    force: bool,
-) -> None:
-    """Write all generated files into out_folder, creating it if needed.
+def prepare_out_folder(out_folder: Path, *, force: bool) -> None:
+    """Make `out_folder` ready for writing.
 
-    Refuses to write into a non-empty existing folder unless `force=True`.
+    Refuses if non-empty and `force=False`. With `force=True`, clears existing
+    contents. Always ensures the folder exists at the end. Called up-front so
+    the orchestrator can open the log file inside it before doing any work.
     """
     if _is_nonempty_dir(out_folder) and not force:
         raise OutFolderError(
@@ -37,7 +31,21 @@ def write_outputs(
                 shutil.rmtree(child)
             else:
                 child.unlink()
+    out_folder.mkdir(parents=True, exist_ok=True)
 
+
+def write_outputs(
+    *,
+    out_folder: Path,
+    manifest: str,
+    makefile: str,
+    definitions: dict[str, str],
+    macros: dict[str, str] | None,
+) -> None:
+    """Write all generated files into out_folder.
+
+    The folder must already exist — call `prepare_out_folder` first.
+    """
     out_folder.mkdir(parents=True, exist_ok=True)
     (out_folder / "manifest.yml").write_text(manifest)
     (out_folder / "Makefile").write_text(makefile)
