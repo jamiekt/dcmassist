@@ -51,7 +51,7 @@ def test_get_ddl_calls_get_ddl_function() -> None:
     fqn = FQN("MYDB", "PUBLIC", "V")
     out = plugin.get_ddl(cursor, fqn)
     cursor.execute.assert_called_once_with(
-        'SELECT GET_DDL(\'VIEW\', \'"MYDB"."PUBLIC"."V"\')'
+        'SELECT GET_DDL(\'VIEW\', \'"MYDB"."PUBLIC"."V"\', TRUE)'
     )
     assert out.startswith("CREATE")
 
