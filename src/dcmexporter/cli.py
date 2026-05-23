@@ -92,7 +92,7 @@ def cli() -> None:
 )
 @click.option(
     "--use-macros/--no-use-macros",
-    default=True,
+    default=False,
     help="Generate per-type Jinja macros and rewrite definitions to invoke them.",
 )
 @click.option(
