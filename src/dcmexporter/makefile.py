@@ -11,9 +11,9 @@ def render_makefile(cfg: Config) -> str:
     # is deployed to, so nudge the user to remove the matching DEFINE block.
     # The warning is in its own target so plan and apply share one source.
     warn_line = (
-        '\t@echo "[dcmexporter] reminder: if your DCM project lives in '
-        "this database, remove the DEFINE for its parent schema from "
-        'sources/definitions/schema.sql before running plan/apply."'
+        '\t@echo "[dcmexporter] reminder: remove the DEFINE for your DCM '
+        "project's parent schema from sources/definitions/schema.sql "
+        'before running plan/apply (DCM rejects it as a parent-schema)."'
     )
     return (
         ".PHONY: warn-parent-schema plan apply\n"
