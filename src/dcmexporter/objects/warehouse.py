@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from dcmexporter.objects._base import V1ObjectPlugin
+from dcmexporter.types import FQN
 
 
 class WarehousePlugin(V1ObjectPlugin):
@@ -27,16 +30,13 @@ class WarehousePlugin(V1ObjectPlugin):
         "{% endmacro %}\n"
     )
 
-    def discover(self, cursor, database, schemas):  # type: ignore[override]
-        # Warehouses are account-level, not database-level.
+    def discover(
+        self, cursor: Any, database: str, schemas: tuple[str, ...] | None
+    ) -> list[FQN]:
+        # Warehouses are account-level; the schemas filter is meaningless here.
         cursor.execute("SHOW WAREHOUSES")
         rows = cursor.fetchall()
-        from dcmexporter.types import FQN
-
-        out: list[FQN] = []
-        for row in rows:
-            name = row["name"] if isinstance(row, dict) else row[0]
-            out.append(FQN(database=database, schema=None, name=name))
+        out = [FQN(database=database, schema=None, name=row["name"]) for row in rows]
         return sorted(out, key=lambda f: f.name)
 
 
