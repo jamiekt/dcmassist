@@ -30,13 +30,16 @@ def test_discover_ignores_schemas_argument() -> None:
     assert sql_log == ["SHOW DATABASES LIKE 'MYDB'"]
 
 
-def test_get_ddl_calls_get_ddl_function() -> None:
+def test_get_ddl_synthesizes_from_show_databases() -> None:
+    """get_ddl uses SHOW DATABASES (not recursive GET_DDL) to build CREATE."""
     cursor = MagicMock()
-    cursor.fetchone.return_value = ["CREATE OR REPLACE DATABASE MYDB"]
+    cursor.execute.return_value = None
+    cursor.fetchall.return_value = [{"name": "MYDB", "comment": "the db"}]
     fqn = FQN("MYDB", None, "MYDB")
     out = plugin.get_ddl(cursor, fqn)
-    cursor.execute.assert_called_once_with("SELECT GET_DDL('DATABASE', 'MYDB')")
-    assert out.startswith("CREATE")
+    cursor.execute.assert_called_once_with("SHOW DATABASES LIKE 'MYDB'")
+    assert out.startswith("CREATE OR REPLACE DATABASE MYDB")
+    assert "COMMENT='the db'" in out
 
 
 def test_to_define_and_invocation_macro_mode() -> None:
