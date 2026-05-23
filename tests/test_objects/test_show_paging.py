@@ -73,6 +73,28 @@ def test_full_page_with_no_more_results_stops_after_short_followup() -> None:
     assert [r["name"] for r in out] == ["A", "B"]
 
 
+def test_on_page_callback_receives_running_total() -> None:
+    """The optional on_page callback fires once per non-empty page with the cumulative count."""
+    cursor = MagicMock()
+    cursor.execute.side_effect = lambda sql: None
+    pages = iter(
+        [
+            [{"name": "A"}, {"name": "B"}],
+            [{"name": "C"}, {"name": "D"}],
+            [{"name": "E"}],
+        ]
+    )
+    cursor.fetchall.side_effect = lambda: next(pages)
+    seen: list[int] = []
+    paginated_show(
+        cursor,
+        "SHOW THINGS IN SCHEMA MYDB.PUBLIC",
+        page_size=2,
+        on_page=seen.append,
+    )
+    assert seen == [2, 4, 5]
+
+
 def test_last_name_with_single_quote_is_escaped() -> None:
     """Snowflake string escape: ' → ''."""
     cursor = MagicMock()

@@ -55,11 +55,21 @@ class V1ObjectPlugin(ObjectPlugin):
 
         rows: list[FQN] = []
         for index, schema in enumerate(target_schemas, start=1):
+            count = f" {index}/{total}" if total > 1 else ""
+            prefix = f"discovering {self.type_name}s in{count} {database}.{schema}"
             if progress is not None:
-                count = f" {index}/{total}" if total > 1 else ""
-                progress(f"discovering {self.type_name}s in{count} {database}.{schema}")
+                progress(prefix)
+
+            on_page = None
+            if progress is not None:
+
+                def on_page(running_total: int, _prefix: str = prefix) -> None:
+                    progress(f"{_prefix}... found {running_total}")
+
             page_rows = paginated_show(
-                cursor, f"{self.SHOW_FORM} IN SCHEMA {database}.{schema}"
+                cursor,
+                f"{self.SHOW_FORM} IN SCHEMA {database}.{schema}",
+                on_page=on_page,
             )
             rows.extend(self._rows_to_fqns(page_rows, database))
         return sorted(rows, key=lambda f: (f.schema or "", f.name))
