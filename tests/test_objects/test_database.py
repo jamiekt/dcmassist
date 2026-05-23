@@ -10,19 +10,24 @@ from dcmexporter.objects.database import plugin
 from dcmexporter.types import FQN
 
 
-def test_discover_uses_show_databases_in_database() -> None:
+def test_discover_uses_show_databases_like() -> None:
     cursor = MagicMock()
+    sql_log: list[str] = []
+    cursor.execute.side_effect = lambda sql: sql_log.append(sql)
     cursor.fetchall.return_value = [{"name": "MYDB"}]
     out = plugin.discover(cursor, "MYDB", None)
-    cursor.execute.assert_called_once_with("SHOW DATABASES IN DATABASE MYDB")
+    assert sql_log == ["SHOW DATABASES LIKE 'MYDB'"]
     assert [str(f) for f in out] == ["MYDB"]
 
 
-def test_discover_filters_by_schema() -> None:
+def test_discover_ignores_schemas_argument() -> None:
+    """Database is account-level; --schema is meaningless. Same SQL either way."""
     cursor = MagicMock()
+    sql_log: list[str] = []
+    cursor.execute.side_effect = lambda sql: sql_log.append(sql)
     cursor.fetchall.return_value = [{"name": "MYDB"}]
-    plugin.discover(cursor, "MYDB", ("S",))
-    cursor.execute.assert_called_once_with("SHOW DATABASES IN SCHEMA MYDB.S")
+    plugin.discover(cursor, "MYDB", ("ANY",))
+    assert sql_log == ["SHOW DATABASES LIKE 'MYDB'"]
 
 
 def test_get_ddl_calls_get_ddl_function() -> None:
