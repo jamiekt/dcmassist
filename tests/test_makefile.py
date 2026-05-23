@@ -53,11 +53,23 @@ def test_makefile_uses_real_tabs_for_recipes() -> None:
     assert plan_recipe_lines[0].startswith("\t")
 
 
-def test_makefile_plan_target_warns_about_parent_schema() -> None:
-    """The plan target prints a warning so users know to drop the DEFINE for
-    the schema their DCM project lives in (DCM rejects 'Project cannot manage
-    its parent schema' otherwise). dcmexporter doesn't know which schema that
-    is, so we can only nudge."""
+def test_makefile_warns_about_parent_schema_for_plan_and_apply() -> None:
+    """Both plan and apply must print the warning so users know to drop the
+    DEFINE for the schema their DCM project lives in (DCM rejects 'Project
+    cannot manage its parent schema'). The warning is in its own target that
+    plan and apply depend on, so the message stays single-sourced."""
     out = render_makefile(_cfg())
     assert "parent schema" in out
     assert "DEFINE" in out
+    lines = out.splitlines()
+    plan_line = next(line for line in lines if line.startswith("plan:"))
+    apply_line = next(line for line in lines if line.startswith("apply:"))
+    # The dep name is whatever target carries the warning; require both to
+    # name the same dependency.
+    plan_deps = plan_line.split(":", 1)[1].split()
+    apply_deps = apply_line.split(":", 1)[1].split()
+    assert plan_deps, "plan target must declare a prerequisite"
+    assert plan_deps == apply_deps, (
+        f"plan and apply must share the same warning prerequisite, "
+        f"got plan={plan_deps} apply={apply_deps}"
+    )
