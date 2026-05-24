@@ -1,6 +1,6 @@
 """Per-run log file written into the output folder.
 
-The orchestrator emits a terse status line and final summary on stderr; the
+The orchestrator emits a status dashboard and final summary on stderr; the
 detailed timeline of every discover, get_ddl, and per-object error goes here.
 This is what users tail when something goes wrong: stderr tells them
 *something* failed, and the log tells them *which* objects and *why*.

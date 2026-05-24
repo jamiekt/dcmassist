@@ -30,8 +30,8 @@ class StatusDashboard:
     """
 
     def __init__(self, stream: IO[str] | None = None) -> None:
-        self._stream: IO[str] | None = stream
-        self._enabled = self._is_tty(stream) and not _disabled_by_env()
+        self._stream: IO[str] = stream if stream is not None else sys.stderr
+        self._enabled = self._is_tty(self._stream) and not _disabled_by_env()
         self._database = ""
         self._now = ""
         self._schema = ""
@@ -100,10 +100,9 @@ class StatusDashboard:
         output so CI/piped runs don't silently lose warnings.
         """
         if self._console is not None:
-            self._console.log(message)
+            self._console.print(message)
             return
-        target = self._stream if self._stream is not None else sys.stderr
-        print(message, file=target)
+        print(message, file=self._stream)
 
     # --- internals ---------------------------------------------------------
 
@@ -137,9 +136,7 @@ class StatusDashboard:
         )
 
     @staticmethod
-    def _is_tty(stream: IO[str] | None) -> bool:
-        if stream is None:
-            return False
+    def _is_tty(stream: IO[str]) -> bool:
         isatty = getattr(stream, "isatty", None)
         return bool(isatty and isatty())
 
