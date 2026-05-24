@@ -152,6 +152,7 @@ def _wrap_body_with_raw_blocks(
     database: str,
     known_schemas: frozenset[str] = frozenset(),
     known_functions: dict[str, str] | None = None,
+    rewrites_log: list[str] | None = None,
 ) -> str:
     """Emit the SELECT body wrapped in `{% raw %}{% endraw %}` blocks, with
     references to `database` swapped for `{{ database }}` outside the raw
@@ -189,6 +190,7 @@ def _wrap_body_with_raw_blocks(
     ]
     db_spans = {(s, e) for s, e, _ in events}
 
+    seen_two_part: set[str] = set()
     if known_schemas:
         alternation = "|".join(
             sorted(map(re.escape, known_schemas), key=len, reverse=True)
@@ -202,7 +204,14 @@ def _wrap_body_with_raw_blocks(
             if any(s <= m.start() < e for s, e in db_spans):
                 continue
             events.append((m.start(), m.start(), "{{ database }}."))
+            if rewrites_log is not None and m.group(0) not in seen_two_part:
+                seen_two_part.add(m.group(0))
+                rewrites_log.append(
+                    f"qualified 2-part reference {m.group(0)!r} -> "
+                    f"'{{{{ database }}}}.{m.group(0)}'"
+                )
 
+    seen_funcs: set[str] = set()
     if known_functions:
         alternation = "|".join(
             sorted(map(re.escape, known_functions), key=len, reverse=True)
@@ -219,6 +228,12 @@ def _wrap_body_with_raw_blocks(
                 continue
             schema = known_functions[m.group("name").upper()]
             events.append((m.start(), m.start(), f"{{{{ database }}}}.{schema}."))
+            if rewrites_log is not None and m.group("name") not in seen_funcs:
+                seen_funcs.add(m.group("name"))
+                rewrites_log.append(
+                    f"qualified 1-part function call {m.group('name')!r} -> "
+                    f"'{{{{ database }}}}.{schema}.{m.group('name')}'"
+                )
 
     events.sort()
 
@@ -272,6 +287,7 @@ class ViewPlugin(V1ObjectPlugin):
         database: str,
         known_schemas: frozenset[str] = frozenset(),
         known_functions: dict[str, str] | None = None,
+        rewrites_log: list[str] | None = None,
     ) -> str:
         # Views don't fit the `_macro_kwargs_from_ddl` shape because the body
         # has to live outside the macro invocation (so its `{% raw %}` markers
@@ -298,6 +314,7 @@ class ViewPlugin(V1ObjectPlugin):
             database=database,
             known_schemas=known_schemas,
             known_functions=known_functions,
+            rewrites_log=rewrites_log,
         )
         return f"{invocation}{wrapped_body}\n;\n"
 

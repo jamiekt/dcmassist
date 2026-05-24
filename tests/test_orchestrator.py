@@ -312,3 +312,69 @@ def test_export_logs_all_config_options_at_start(tmp_path: Path) -> None:
     assert "force=True" in log_text
     assert "includes=('Table',)" in log_text
     assert "DCMASSIST_EXPORT_OBJECTS_PER_FILE=100" in log_text
+
+
+def test_export_logs_warning_when_view_body_is_rewritten(tmp_path: Path) -> None:
+    """The orchestrator records a `WARN` line per qualification rewrite so
+    users can audit which view bodies were edited. The note includes the
+    type, FQN, and the rewritten token."""
+    out = tmp_path / "out"
+
+    fake_cursor = MagicMock()
+    fake_conn = MagicMock()
+    fake_conn.account = "AB12345"
+    fake_conn.cursor.return_value = fake_cursor
+
+    def execute_side_effect(sql, *args, **kwargs):
+        fake_cursor._last_sql = sql
+
+    def fetchall_side_effect():
+        sql = fake_cursor._last_sql
+        if "SHOW SCHEMAS" in sql:
+            return [
+                {"name": "PUBLIC", "database_name": "MYDB"},
+                {"name": "ANALYTICS", "database_name": "MYDB"},
+            ]
+        if "SHOW VIEWS" in sql and "PUBLIC" in sql:
+            return [{"name": "V", "schema_name": "PUBLIC"}]
+        if "SHOW USER FUNCTIONS" in sql or "SHOW PROCEDURES" in sql:
+            return []
+        return []
+
+    def fetchone_side_effect():
+        if "GET_DDL" in fake_cursor._last_sql:
+            return [
+                "CREATE OR REPLACE VIEW MYDB.PUBLIC.V AS "
+                "SELECT * FROM ANALYTICS.OTHER_VIEW"
+            ]
+        return None
+
+    fake_cursor.execute.side_effect = execute_side_effect
+    fake_cursor.fetchall.side_effect = fetchall_side_effect
+    fake_cursor.fetchone.side_effect = fetchone_side_effect
+
+    cfg = Config(
+        database="MYDB",
+        schemas=(),
+        connection=None,
+        targets=("start",),
+        default_target="start",
+        templating_defaults=(),
+        configurations=(),
+        templating_configuration_keys=(),
+        includes=("View",),
+        excludes=(),
+        comment="",
+        use_macros=True,
+        out_folder=out,
+        force=True,
+    )
+
+    with patch("dcmassist.orchestrator.open_connection") as oc:
+        oc.return_value = fake_conn
+        export(cfg)
+
+    log_text = (out / "dcmassist-export.log").read_text()
+    assert "WARN" in log_text
+    assert "MYDB.PUBLIC.V" in log_text
+    assert "qualified 2-part reference 'ANALYTICS.OTHER_VIEW'" in log_text

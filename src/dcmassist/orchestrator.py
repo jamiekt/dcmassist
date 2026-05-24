@@ -108,6 +108,7 @@ def export(cfg: Config) -> int:
                 for index, fqn in enumerate(fqns, start=1):
                     progress = f"{index}/{total} " if total > 1 else ""
                     status.set_now(f"{type_name} {progress}{fqn}")
+                    rewrites: list[str] = []
                     try:
                         ddl = plugin.get_ddl(cursor, fqn)
                         block = plugin.to_define_and_invocation(
@@ -117,6 +118,7 @@ def export(cfg: Config) -> int:
                             database=cfg.database,
                             known_schemas=known_schemas,
                             known_functions=known_functions,
+                            rewrites_log=rewrites,
                         )
                     except Exception as exc:  # noqa: BLE001
                         log.error(f"{type_name} {fqn}: {exc}")
@@ -132,6 +134,8 @@ def export(cfg: Config) -> int:
                         continue
                     blocks.append(block)
                     exported += 1
+                    for note in rewrites:
+                        log.warn(f"{type_name} {fqn}: {note}")
                     status.set_counts(
                         exported=exported,
                         errors=errors,

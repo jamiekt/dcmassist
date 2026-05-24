@@ -218,6 +218,52 @@ def test_body_bare_udf_call_is_qualified_when_function_is_known() -> None:
     assert "RUNTIME.LABOR_PLANNING_COOKED.SPLIT_PART" not in rendered
 
 
+def test_rewrites_log_records_2part_and_1part_qualifications() -> None:
+    """Each rewrite must surface a one-line note in `rewrites_log` so the
+    orchestrator can warn users that the body was edited. Repeated rewrites
+    of the same token dedupe to keep the log readable on large views."""
+    rewrites: list[str] = []
+    plugin.to_define_and_invocation(
+        "CREATE OR REPLACE VIEW MYDB.PUBLIC.V AS "
+        "SELECT GET_COHORT_DAYS(c), GET_COHORT_DAYS(c2) "
+        "FROM EMPLOYEE_COOKED.WORKDAY_VIEW UNION ALL "
+        "SELECT 1, 2 FROM EMPLOYEE_COOKED.WORKDAY_VIEW",
+        comment=None,
+        use_macros=True,
+        database="MYDB",
+        known_schemas=frozenset({"PUBLIC", "EMPLOYEE_COOKED"}),
+        known_functions={"GET_COHORT_DAYS": "LABOR_PLANNING_COOKED"},
+        rewrites_log=rewrites,
+    )
+    assert any(
+        "qualified 2-part reference 'EMPLOYEE_COOKED.WORKDAY_VIEW'" in r
+        for r in rewrites
+    ), rewrites
+    assert any(
+        "qualified 1-part function call 'GET_COHORT_DAYS'" in r for r in rewrites
+    ), rewrites
+    # Dedupe: the same 2-part reference appears twice in the body but the
+    # log entry should only fire once.
+    twoparts = [r for r in rewrites if "EMPLOYEE_COOKED.WORKDAY_VIEW" in r]
+    assert len(twoparts) == 1, twoparts
+
+
+def test_rewrites_log_left_empty_when_nothing_rewritten() -> None:
+    """A view body that doesn't trigger any qualification must leave the
+    log empty so the orchestrator emits no warnings."""
+    rewrites: list[str] = []
+    plugin.to_define_and_invocation(
+        "CREATE OR REPLACE VIEW MYDB.PUBLIC.V AS SELECT 1",
+        comment=None,
+        use_macros=True,
+        database="MYDB",
+        known_schemas=frozenset({"PUBLIC"}),
+        known_functions={"GET_COHORT_DAYS": "LABOR_PLANNING_COOKED"},
+        rewrites_log=rewrites,
+    )
+    assert rewrites == []
+
+
 def test_body_already_qualified_udf_call_isnt_double_qualified() -> None:
     """A function call that's already 2- or 3-part qualified must not gain
     another prefix from the function-qualification pass."""

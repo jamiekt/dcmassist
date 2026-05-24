@@ -36,6 +36,7 @@ class ObjectPlugin(ABC):
         database: str,
         known_schemas: frozenset[str] = frozenset(),
         known_functions: dict[str, str] | None = None,
+        rewrites_log: list[str] | None = None,
     ) -> str: ...
 
     @abstractmethod
