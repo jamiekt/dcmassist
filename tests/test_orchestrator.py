@@ -78,8 +78,24 @@ def test_export_writes_full_layout(tmp_path: Path) -> None:
     assert "PUBLIC: 1" in log_text
 
     table_sql = (out / "sources" / "definitions" / "table.sql").read_text()
+    macro_sql = (out / "sources" / "macros" / "table.sql").read_text()
     assert "{{ define_table(" in table_sql
-    assert "{{ database }}.PUBLIC.T1" in table_sql
+    # Database must reach the macro as a live identifier reference, not a
+    # nested string literal that would render to the inert text {{ database }}.
+    assert "database=database" in table_sql
+    assert "{{ database }}" not in table_sql
+
+    # The macro + invocation must produce the expected DDL through one Jinja
+    # pass — this is the regression guard for the use_macros bug.
+    import jinja2
+
+    rendered = (
+        jinja2.Environment()
+        .from_string(macro_sql + "\n" + table_sql)
+        .render(database="RUNTIME_DB")
+    )
+    assert "DEFINE TABLE RUNTIME_DB.PUBLIC.T1" in rendered
+    assert "{{ database }}" not in rendered
 
     manifest = (out / "manifest.yml").read_text()
     assert "STAGING:" in manifest

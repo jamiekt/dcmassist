@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import jinja2
+
 from dcmassist.rewrite import (
+    JinjaExpr,
     create_to_define,
     inject_comment_if_missing,
     parameterise_database,
+    parameterise_database_as_expr,
     render_macro_invocation,
 )
 
@@ -115,3 +119,61 @@ def test_render_macro_invocation_omits_none_values() -> None:
     )
     assert "comment=" not in out
     assert "name='FOO'" in out
+
+
+def test_render_macro_invocation_emits_jinja_expr_unquoted() -> None:
+    out = render_macro_invocation(
+        "define_table",
+        kwargs={"database": JinjaExpr("database"), "name": "FOO"},
+    )
+    assert "database=database" in out
+    assert "database='database'" not in out
+    assert "name='FOO'" in out
+
+
+def test_parameterise_database_as_expr_splits_around_db_references() -> None:
+    expr = parameterise_database_as_expr(
+        "DEFINE TABLE MYDB.PUBLIC.FOO (X INT)", database="MYDB"
+    )
+    assert isinstance(expr, JinjaExpr)
+    assert "database" in expr.source
+    assert "'DEFINE TABLE '" in expr.source
+    assert "'.PUBLIC.FOO (X INT)'" in expr.source
+
+
+def test_parameterise_database_as_expr_renders_through_jinja() -> None:
+    """The whole point of the expression form: a single Jinja pass with the
+    `database` variable bound must produce DDL with the runtime db name."""
+    expr = parameterise_database_as_expr(
+        "DEFINE TABLE MYDB.PUBLIC.FOO (X INT)", database="MYDB"
+    )
+    out = (
+        jinja2.Environment()
+        .from_string("{{ " + expr.source + " }}")
+        .render(database="RUNTIME_DB")
+    )
+    assert out == "DEFINE TABLE RUNTIME_DB.PUBLIC.FOO (X INT)"
+
+
+def test_parameterise_database_as_expr_no_match_returns_quoted_literal() -> None:
+    expr = parameterise_database_as_expr(
+        "DEFINE WAREHOUSE WH SIZE = 'X-Small'", database="MYDB"
+    )
+    out = (
+        jinja2.Environment()
+        .from_string("{{ " + expr.source + " }}")
+        .render(database="RUNTIME_DB")
+    )
+    assert out == "DEFINE WAREHOUSE WH SIZE = 'X-Small'"
+
+
+def test_parameterise_database_as_expr_escapes_single_quotes() -> None:
+    expr = parameterise_database_as_expr(
+        "DEFINE TABLE MYDB.PUBLIC.FOO COMMENT='it''s fine'", database="MYDB"
+    )
+    out = (
+        jinja2.Environment()
+        .from_string("{{ " + expr.source + " }}")
+        .render(database="RUNTIME_DB")
+    )
+    assert out == "DEFINE TABLE RUNTIME_DB.PUBLIC.FOO COMMENT='it''s fine'"

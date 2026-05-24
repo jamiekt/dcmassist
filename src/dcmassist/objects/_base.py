@@ -20,9 +20,11 @@ from typing import Any
 from dcmassist.objects._show_paging import paginated_show
 from dcmassist.plugin import ObjectPlugin, ProgressCallback
 from dcmassist.rewrite import (
+    JinjaExpr,
     create_to_define,
     inject_comment_if_missing,
     parameterise_database,
+    parameterise_database_as_expr,
     render_macro_invocation,
 )
 from dcmassist.types import FQN
@@ -135,9 +137,9 @@ class V1ObjectPlugin(ObjectPlugin):
         define = inject_comment_if_missing(
             define, comment=comment, supports_comment=self.SUPPORTS_COMMENT
         )
-        define = parameterise_database(define, database=database)
 
         if not use_macros:
+            define = parameterise_database(define, database=database)
             return define + ("\n" if not define.endswith("\n") else "")
 
         kwargs = self._macro_kwargs_from_ddl(define, database=database)
@@ -147,13 +149,18 @@ class V1ObjectPlugin(ObjectPlugin):
     def _macro_kwargs_from_ddl(
         self, define_ddl: str, *, database: str
     ) -> dict[str, Any]:
-        """Default: pass the whole DDL through a `raw` kwarg.
+        """Default: pass the whole DDL through a `raw` kwarg as a Jinja
+        string-concat expression so references to the runtime `database`
+        variable stay live (a plain string literal would inertly contain the
+        text `{{ database }}` after one Jinja pass — see
+        `parameterise_database_as_expr`).
 
         Subclasses override this to extract structured kwargs from the AST.
-        The default lets every v1 plugin function correctly while subclasses
-        can incrementally add richer macro signatures.
         """
-        return {"database": "{{ database }}", "raw": define_ddl}
+        return {
+            "database": JinjaExpr("database"),
+            "raw": parameterise_database_as_expr(define_ddl, database=database),
+        }
 
     def macro_definition(self) -> str:
         if not self.MACRO_BODY:

@@ -65,6 +65,17 @@ def test_to_define_and_invocation_macro_mode() -> None:
     )
     assert out.startswith("{{ define_table(")
     assert "raw=" in out
+    # database must reach the macro as an identifier ref, not a string literal
+    # — otherwise the {{ database }} inside `raw` stays literal after one pass.
+    assert "database=database" in out
+    # Rendering the macro + invocation together must substitute the runtime db.
+    rendered = (
+        jinja2.Environment()
+        .from_string(plugin.macro_definition() + "\n" + out)
+        .render(database="RUNTIME")
+    )
+    assert "DEFINE TABLE RUNTIME.PUBLIC.T" in rendered
+    assert "{{ database }}" not in rendered
 
 
 def test_to_define_and_invocation_raw_mode() -> None:
