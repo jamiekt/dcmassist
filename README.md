@@ -7,7 +7,7 @@ You've decided to manage your Snowflake schema with Declarative Change Managemen
 Point `dcmassist` at your database and it produces a complete, ready-to-commit DCM project — `manifest.yml`, `Makefile`, definitions, optional macros, the lot.
 
 ```bash
-dcmassist export --database MYDB --out-folder ./my-dcm-project
+uvx dcmassist export --database MYDB --out-folder ./my-dcm-project
 ```
 
 That's it. Commit, deploy, done.
@@ -42,30 +42,38 @@ my-dcm-project/
         └── <type>.sql
 ```
 
-## Install
+## Run
 
-Requires Python ≥ 3.10 and a configured [`snow` CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli/index) connection.
+Requires Python ≥ 3.10, [`uv`](https://docs.astral.sh/uv/), and a configured [`snow` CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli/index) connection.
+
+`dcmassist` is a one-shot tool — you run it when you need a DCM project and rarely after that. The simplest way is `uvx`, which fetches and runs without a permanent install:
 
 ```bash
-uv tool install dcmassist        # recommended
+uvx dcmassist export --database MYDB
+```
+
+Pin a version for reproducibility:
+
+```bash
+uvx dcmassist@0.1.15 export --database MYDB
+```
+
+If you'd rather keep it installed:
+
+```bash
+uv tool install dcmassist
 # or
 pipx install dcmassist
-# or
-pip install dcmassist
 ```
 
 ## Quick examples
 
-Export a whole database:
-
-```bash
-dcmassist export --database MYDB
-```
+The examples below use `uvx`; substitute `dcmassist` if you've installed it.
 
 Just tables and views from one schema, with macros, into a custom folder:
 
 ```bash
-dcmassist export \
+uvx dcmassist export \
     --database MYDB \
     --schema PUBLIC \
     --include Table --include View \
@@ -76,14 +84,14 @@ dcmassist export \
 Multi-environment manifest with templated configurations:
 
 ```bash
-dcmassist export \
+uvx dcmassist export \
     --database MYDB \
     --target dev --target prod \
     --configuration STAGING \
     --templating-default warehouse=COMPUTE_WH
 ```
 
-Run `dcmassist export --help` for every option.
+Run `uvx dcmassist export --help` for every option.
 
 ## Type support
 
