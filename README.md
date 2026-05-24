@@ -114,6 +114,10 @@ Run `uvx dcmassist export --help` for every option.
 | `4` | Ran to completion but exported nothing — every object failed (typically permission errors) |
 | `5` | Setup error — bad env var, or non-empty output folder without `--force` |
 
+## Known limitations
+
+- **Pre-existing objects not owned by your role.** `dcmassist` exports every object the running role can _see_, but `snow dcm plan` only succeeds for objects the running role _owns_. Visible-but-not-owned objects produce errors like `File_format 'JSON' already exists, but current role has no privileges on it` during `snow dcm plan`. The cleanest workaround is to run `dcmassist export` (and the resulting `snow dcm plan`) as a role that owns the objects you want to manage — typically `ACCOUNTADMIN`, or a custom role with ownership on the relevant schemas. Alternatively, prune the unwanted objects from the generated `sources/definitions/*.sql` files before deploying.
+
 ## Project status
 
 Pre-1.0. The output layout, CLI flags, and log format are stable enough to use; expect breaking changes between minor versions until 1.0. Issues and pull requests welcome at [github.com/jamiekt/dcmassist](https://github.com/jamiekt/dcmassist).
