@@ -44,6 +44,10 @@ def write_outputs(
 ) -> None:
     """Write all generated files into out_folder.
 
+    `definitions` is keyed by full filename (``"table.sql"``, ``"table2.sql"``,
+    …); the orchestrator decides chunk names. Macros are still keyed by slug
+    because there's exactly one macro file per type.
+
     The folder must already exist — call `prepare_out_folder` first.
     """
     out_folder.mkdir(parents=True, exist_ok=True)
@@ -52,10 +56,10 @@ def write_outputs(
 
     definitions_dir = out_folder / "sources" / "definitions"
     definitions_dir.mkdir(parents=True, exist_ok=True)
-    for slug, body in definitions.items():
+    for filename, body in definitions.items():
         if not body:
             continue
-        (definitions_dir / f"{slug}.sql").write_text(body)
+        (definitions_dir / filename).write_text(body)
 
     if macros:
         macros_dir = out_folder / "sources" / "macros"
