@@ -1,6 +1,6 @@
 # dcmassist
 
-**Turn an existing Snowflake database into a [DCM project](https://docs.snowflake.com/en/user-guide/dcm-projects/about-dcm-projects) in seconds.**
+**Turn an existing Snowflake database into a [DCM project](https://docs.snowflake.com/en/user-guide/dcm-projects/dcm-projects-overview) in seconds.**
 
 You've decided to manage your Snowflake schema with Declarative Change Management. Now you need a `DEFINE TABLE …` block for every table, view, schema, stage, sequence, file format, and tag you already have. Hand-writing thousands of these is the wrong way to start.
 
@@ -44,7 +44,7 @@ my-dcm-project/
 
 ## Install
 
-Requires Python ≥ 3.10 and a configured [`snow` CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli-v2/index) connection.
+Requires Python ≥ 3.10 and a configured [`snow` CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli/index) connection.
 
 ```bash
 uv tool install dcmassist        # recommended
