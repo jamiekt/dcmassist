@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import sys
 from typing import Any
 
@@ -40,7 +41,10 @@ def export(cfg: Config) -> int:
             return 5
 
         log = RunLog(cfg.out_folder / "dcmexporter.log")
-        log.info(f"export starting database={cfg.database} out_folder={cfg.out_folder}")
+        log.info("export starting")
+        for field in dataclasses.fields(cfg):
+            log.info(f"  {field.name}={getattr(cfg, field.name)!r}")
+        log.info(f"  {OBJECTS_PER_FILE_ENV}={objects_per_file}")
 
         with StatusDashboard(stream=sys.stderr) as status:
             status.set_database(cfg.database)
