@@ -142,7 +142,7 @@ jobs:
           VERSION: ${{ needs.build.outputs.version }}
           RELEASE_NOTES: ${{ inputs.release_notes }}
         run: |
-          pypi_line="Published to PyPI: https://pypi.org/project/dcmexporter/${VERSION}/"
+          pypi_line="Published to PyPI: https://pypi.org/project/dcmassist/${VERSION}/"
           if [ -n "${RELEASE_NOTES}" ]; then
             notes="${RELEASE_NOTES}"$'\n\n'"${pypi_line}"
           else
