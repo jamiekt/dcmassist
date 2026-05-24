@@ -147,27 +147,27 @@ def test_export_default_target_when_none_given() -> None:
     assert cfg.default_target == "start"
 
 
-def test_export_use_macros_default_false() -> None:
-    """Omitting --use-macros must not generate a sources/macros folder."""
+def test_export_use_macros_default_true() -> None:
+    """Omitting --use-macros generates the sources/macros folder by default."""
     runner = CliRunner()
     with patch("dcmassist.cli.run_export") as run:
         run.return_value = 0
         runner.invoke(cli, ["export", "--database", "MYDB"], catch_exceptions=False)
     cfg = run.call_args.args[0]
-    assert cfg.use_macros is False
+    assert cfg.use_macros is True
 
 
-def test_export_use_macros_opt_in() -> None:
+def test_export_no_use_macros_opt_out() -> None:
     runner = CliRunner()
     with patch("dcmassist.cli.run_export") as run:
         run.return_value = 0
         runner.invoke(
             cli,
-            ["export", "--database", "MYDB", "--use-macros"],
+            ["export", "--database", "MYDB", "--no-use-macros"],
             catch_exceptions=False,
         )
     cfg = run.call_args.args[0]
-    assert cfg.use_macros is True
+    assert cfg.use_macros is False
 
 
 def test_export_empty_comment_kept_as_empty_string() -> None:

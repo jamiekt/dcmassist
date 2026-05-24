@@ -19,7 +19,7 @@ That's it. Commit, deploy, done.
 - **Safe with secrets.** Stage definitions are synthesized without credentials — credentials live on storage integrations, not in git. You won't accidentally commit AWS keys.
 - **Built for real Snowflake accounts.** Paginates `SHOW` past the 10K-row cap. Quotes identifiers properly so leading-digit and lowercase names survive. Skips objects your role can't see instead of failing the run.
 - **Predictable output.** Per-type files, deterministic ordering, automatic chunking when a type grows beyond a threshold. Diffs stay readable as your project evolves.
-- **Optional Jinja macros.** With `--use-macros`, every definition is a one-line macro invocation, so a column rename touches one file instead of hundreds.
+- **Jinja macros by default.** Every definition is a one-line macro invocation, so a column rename touches one file instead of hundreds. Pass `--no-use-macros` to emit raw DDL instead.
 - **Observable runs.** Live status panel while it works; a per-run log file you can tail when something looks wrong.
 
 ## What you get
@@ -38,7 +38,7 @@ my-dcm-project/
     │   ├── stage.sql           # synthesized — no credentials
     │   ├── file_format.sql
     │   └── tag.sql
-    └── macros/                 # only with --use-macros
+    └── macros/                 # default; suppress with --no-use-macros
         └── <type>.sql
 ```
 
@@ -70,14 +70,13 @@ pipx install dcmassist
 
 The examples below use `uvx`; substitute `dcmassist` if you've installed it.
 
-Just tables and views from one schema, with macros, into a custom folder:
+Just tables and views from one schema, into a custom folder:
 
 ```bash
 uvx dcmassist export \
     --database MYDB \
     --schema PUBLIC \
     --include Table --include View \
-    --use-macros \
     --out-folder ./project
 ```
 

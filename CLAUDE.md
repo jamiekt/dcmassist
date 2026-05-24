@@ -23,7 +23,7 @@ The project uses `uv` for everything; do not invoke `pip` or `python` directly.
 | Auto-fix | `uv run ruff check --fix src tests && uv run ruff format src tests` |
 | Type check | `uv run mypy src` |
 
-User-facing CLI flags (`--use-macros`, `--include`, `--schema`, `--target`, `--configuration`, `--templating-default`, `--out-folder`, `--force`) are documented in `README.md` § "Quick examples" and defined in `cli.py`. Run `uv run dcmassist export --help` for the full list.
+User-facing CLI flags (`--use-macros/--no-use-macros` (default on), `--include`, `--schema`, `--target`, `--configuration`, `--templating-default`, `--out-folder`, `--force`) are documented in `README.md` § "Quick examples" and defined in `cli.py`. Run `uv run dcmassist export --help` for the full list.
 
 A pre-commit hook runs `ruff format`, `ruff` (with `--fix`), and `mypy src` across the whole tree on every commit. **Never bypass it with `--no-verify`** — if a hook fails, fix the underlying issue. If a refactor breaks a different file's call site, that's a sign two changes need to land in one commit (this has happened before with the orchestrator/render and orchestrator/status pairs).
 
