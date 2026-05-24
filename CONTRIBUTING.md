@@ -64,7 +64,7 @@ These are enforced by review (and partly by tooling):
 
 1. `resolve_objects_per_file()` — read `DCMASSIST_EXPORT_OBJECTS_PER_FILE` *before* touching the output folder (a bad value must not blow away the user's directory).
 2. `prepare_out_folder()` — refuse non-empty unless `--force`; clear and recreate.
-3. Open `RunLog` at `<out>/dcmassist.log` and dump every Config field so users see (and discover) available options.
+3. Open `RunLog` at `<out>/dcmassist-export.log` and dump every Config field so users see (and discover) available options.
 4. Inside a `StatusDashboard` (Rich `Live` panel), connect to Snowflake and iterate `filter_types(cfg)`.
 5. For each type, dispatch to its plugin: `discover()` → per-FQN `get_ddl()` → `to_define_and_invocation()`.
 6. Chunk per-type blocks via `chunk_blocks()` into `dict[filename, body]` keyed by full filename (`table.sql`, `table2.sql`, …). The first chunk keeps the unsuffixed name so small exports look identical to before chunking existed.
@@ -101,7 +101,7 @@ To add a new v1 type:
 ### Status & logging split
 
 - **`StatusDashboard`** (`status.py`) — Rich `Live` panel on stderr, transient. Silent on non-TTY, `NO_COLOR=1`, or `DCMASSIST_NO_STATUS=1`. `.log()` writes above the panel; falls back to plain stderr when disabled so warnings still surface in CI.
-- **`RunLog`** (`log.py`) — per-run timestamped log file at `<out>/dcmassist.log`. Truncated on each run. This is what users tail when something goes wrong.
+- **`RunLog`** (`log.py`) — per-run timestamped log file at `<out>/dcmassist-export.log`. Truncated on each run. This is what users tail when something goes wrong.
 
 The dashboard answers "what's happening right now"; the log answers "what happened to which object and why".
 
@@ -121,7 +121,7 @@ Larger features start with a spec in `docs/superpowers/specs/` and a plan in `do
 Open an issue at [github.com/jamiekt/dcmassist/issues](https://github.com/jamiekt/dcmassist/issues) with:
 
 - The command you ran.
-- The relevant section of `dcmassist.log`.
+- The relevant section of `dcmassist-export.log`.
 - Snowflake account region (if reproducible only on certain regions).
 - Whether the same export works against a different database / role.
 

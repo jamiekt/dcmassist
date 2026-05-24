@@ -40,7 +40,7 @@ def export(cfg: Config) -> int:
             print(f"[dcmassist] {exc}", file=sys.stderr)
             return 5
 
-        log = RunLog(cfg.out_folder / "dcmassist.log")
+        log = RunLog(cfg.out_folder / "dcmassist-export.log")
         log.info("export starting")
         for field in dataclasses.fields(cfg):
             log.info(f"  {field.name}={getattr(cfg, field.name)!r}")

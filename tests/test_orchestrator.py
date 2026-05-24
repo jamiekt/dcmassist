@@ -73,7 +73,7 @@ def test_export_writes_full_layout(tmp_path: Path) -> None:
     assert (out / "sources" / "definitions" / "table.sql").exists()
     assert (out / "sources" / "macros" / "table.sql").exists()
 
-    log_text = (out / "dcmassist.log").read_text()
+    log_text = (out / "dcmassist-export.log").read_text()
     assert "ANALYTICS: 2" in log_text
     assert "PUBLIC: 1" in log_text
 
@@ -123,7 +123,7 @@ def test_export_per_object_get_ddl_failure_continues(tmp_path: Path, capsys) -> 
         code = export(_cfg(out))
 
     assert code == 0
-    log_text = (out / "dcmassist.log").read_text()
+    log_text = (out / "dcmassist-export.log").read_text()
     assert "T_BAD" in log_text
     assert "permission denied" in log_text
     body = (out / "sources" / "definitions" / "table.sql").read_text()
@@ -244,7 +244,7 @@ def test_export_chunks_definitions_when_over_threshold(
     assert (defs / "table3.sql").exists()
     assert not (defs / "table4.sql").exists()
 
-    log_text = (out / "dcmassist.log").read_text()
+    log_text = (out / "dcmassist-export.log").read_text()
     assert "2 table(s) written to table.sql" in log_text
     assert "2 table(s) written to table2.sql" in log_text
     assert "1 table(s) written to table3.sql" in log_text
@@ -265,7 +265,7 @@ def test_export_invalid_objects_per_file_returns_5(
 
 
 def test_export_logs_all_config_options_at_start(tmp_path: Path) -> None:
-    """The header of dcmassist.log records every Config field plus the
+    """The header of dcmassist-export.log records every Config field plus the
     resolved chunk size, so users can see what options were chosen and
     discover ones they didn't know about."""
     out = tmp_path / "out"
@@ -289,7 +289,7 @@ def test_export_logs_all_config_options_at_start(tmp_path: Path) -> None:
         oc.return_value = fake_conn
         export(_cfg(out))
 
-    log_text = (out / "dcmassist.log").read_text()
+    log_text = (out / "dcmassist-export.log").read_text()
     assert "export starting" in log_text
     assert "database='MYDB'" in log_text
     assert "use_macros=True" in log_text

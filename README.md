@@ -28,7 +28,7 @@ That's it. Commit, deploy, done.
 my-dcm-project/
 ├── manifest.yml                # targets, configurations, templating defaults
 ├── Makefile                    # deploy, plan, sync, validate
-├── dcmassist.log               # per-run log of options + per-object results
+├── dcmassist-export.log        # per-run log of options + per-object results
 └── sources/
     ├── definitions/
     │   ├── schema.sql          # one file per type
