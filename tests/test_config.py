@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from dcmexporter.config import (
+from dcmassist.config import (
     Config,
     parse_templating_default,
     resolve_default_target,

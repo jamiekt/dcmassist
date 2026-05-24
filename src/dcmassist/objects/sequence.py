@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dcmexporter.objects._base import V1ObjectPlugin
+from dcmassist.objects._base import V1ObjectPlugin
 
 
 class SequencePlugin(V1ObjectPlugin):

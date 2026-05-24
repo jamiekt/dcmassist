@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from dcmexporter.plugin import ObjectPlugin, PluginRegistry
+from dcmassist.plugin import ObjectPlugin, PluginRegistry
 
 
 class _FakePlugin(ObjectPlugin):
@@ -45,7 +45,7 @@ def test_registry_get_unknown_raises() -> None:
 
 
 def test_registry_iteration_order_matches_v1_types() -> None:
-    from dcmexporter.types import V1_TYPES
+    from dcmassist.types import V1_TYPES
 
     class _P(ObjectPlugin):
         def __init__(self, name: str) -> None:

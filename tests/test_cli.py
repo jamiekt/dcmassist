@@ -6,13 +6,13 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from dcmexporter.cli import cli
+from dcmassist.cli import cli
 
 
 def _invoke(args: list[str]) -> tuple[int, str]:
     """Run the CLI with `--database` plumbed through. Patches the orchestrator."""
     runner = CliRunner()
-    with patch("dcmexporter.cli.run_export") as run:
+    with patch("dcmassist.cli.run_export") as run:
         run.return_value = 0
         result = runner.invoke(cli, args, catch_exceptions=False)
     return result.exit_code, result.output
@@ -112,7 +112,7 @@ def test_export_malformed_templating_default() -> None:
 
 def test_export_passes_normalised_config_to_runner() -> None:
     runner = CliRunner()
-    with patch("dcmexporter.cli.run_export") as run:
+    with patch("dcmassist.cli.run_export") as run:
         run.return_value = 0
         result = runner.invoke(
             cli,
@@ -139,7 +139,7 @@ def test_export_passes_normalised_config_to_runner() -> None:
 
 def test_export_default_target_when_none_given() -> None:
     runner = CliRunner()
-    with patch("dcmexporter.cli.run_export") as run:
+    with patch("dcmassist.cli.run_export") as run:
         run.return_value = 0
         runner.invoke(cli, ["export", "--database", "MYDB"], catch_exceptions=False)
     cfg = run.call_args.args[0]
@@ -150,7 +150,7 @@ def test_export_default_target_when_none_given() -> None:
 def test_export_use_macros_default_false() -> None:
     """Omitting --use-macros must not generate a sources/macros folder."""
     runner = CliRunner()
-    with patch("dcmexporter.cli.run_export") as run:
+    with patch("dcmassist.cli.run_export") as run:
         run.return_value = 0
         runner.invoke(cli, ["export", "--database", "MYDB"], catch_exceptions=False)
     cfg = run.call_args.args[0]
@@ -159,7 +159,7 @@ def test_export_use_macros_default_false() -> None:
 
 def test_export_use_macros_opt_in() -> None:
     runner = CliRunner()
-    with patch("dcmexporter.cli.run_export") as run:
+    with patch("dcmassist.cli.run_export") as run:
         run.return_value = 0
         runner.invoke(
             cli,
@@ -172,7 +172,7 @@ def test_export_use_macros_opt_in() -> None:
 
 def test_export_empty_comment_kept_as_empty_string() -> None:
     runner = CliRunner()
-    with patch("dcmexporter.cli.run_export") as run:
+    with patch("dcmassist.cli.run_export") as run:
         run.return_value = 0
         runner.invoke(
             cli,
@@ -185,17 +185,17 @@ def test_export_empty_comment_kept_as_empty_string() -> None:
 
 def test_export_default_comment_includes_url_and_date() -> None:
     runner = CliRunner()
-    with patch("dcmexporter.cli.run_export") as run:
+    with patch("dcmassist.cli.run_export") as run:
         run.return_value = 0
         runner.invoke(cli, ["export", "--database", "MYDB"], catch_exceptions=False)
     cfg = run.call_args.args[0]
     assert cfg.comment is not None
-    assert "github.com/jamiekt/dcmexporter" in cfg.comment
+    assert "github.com/jamiekt/dcmassist" in cfg.comment
 
 
 def test_export_templating_default_json_value_parsed() -> None:
     runner = CliRunner()
-    with patch("dcmexporter.cli.run_export") as run:
+    with patch("dcmassist.cli.run_export") as run:
         run.return_value = 0
         runner.invoke(
             cli,

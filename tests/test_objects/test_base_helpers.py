@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from dcmexporter.objects._base import V1ObjectPlugin
+from dcmassist.objects._base import V1ObjectPlugin
 
 
 class _MinimalPlugin(V1ObjectPlugin):

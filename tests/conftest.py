@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for dcmexporter tests."""
+"""Shared pytest fixtures for dcmassist tests."""
 
 from __future__ import annotations
 

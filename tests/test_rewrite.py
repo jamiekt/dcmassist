@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dcmexporter.rewrite import (
+from dcmassist.rewrite import (
     create_to_define,
     inject_comment_if_missing,
     parameterise_database,

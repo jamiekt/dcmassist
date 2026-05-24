@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dcmexporter.types import (
+from dcmassist.types import (
     DCM_TYPES,
     UNIMPLEMENTED_TYPES,
     V1_TYPES,

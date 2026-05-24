@@ -217,7 +217,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# dcmexporter default output folder
+# dcmassist default output folder
 out/
 
 # Claude Code local settings

@@ -2,7 +2,7 @@
 
 We avoid `GET_DDL('SCHEMA', …)` because Snowflake returns the recursive DDL
 of every contained table/view/etc., which can take a very long time on busy
-schemas. dcmexporter exports each contained object individually anyway, so
+schemas. dcmassist exports each contained object individually anyway, so
 the recursive call is wasted work.
 
 A minimal `CREATE OR REPLACE SCHEMA` is enough — child objects bring their
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from dcmexporter.types import FQN
+from dcmassist.types import FQN
 
 
 class SchemaNotExportable(RuntimeError):

@@ -96,7 +96,7 @@ class StatusDashboard:
 
         Use for warnings/errors that would otherwise be overwritten by the
         next refresh. When the dashboard is disabled (non-TTY, NO_COLOR, or
-        DCMEXPORTER_NO_STATUS=1) the message still reaches stderr-equivalent
+        DCMASSIST_NO_STATUS=1) the message still reaches stderr-equivalent
         output so CI/piped runs don't silently lose warnings.
         """
         if self._console is not None:
@@ -130,7 +130,7 @@ class StatusDashboard:
 
         return Panel(
             Group(body, Text(""), counts),
-            title="dcmexporter",
+            title="dcmassist",
             title_align="left",
             border_style="dim",
         )
@@ -144,4 +144,4 @@ class StatusDashboard:
 def _disabled_by_env() -> bool:
     if os.environ.get("NO_COLOR"):
         return True
-    return os.environ.get("DCMEXPORTER_NO_STATUS") == "1"
+    return os.environ.get("DCMASSIST_NO_STATUS") == "1"

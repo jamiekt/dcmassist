@@ -1,4 +1,4 @@
-"""dcmexporter CLI."""
+"""dcmassist CLI."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 
-from dcmexporter.config import (
+from dcmassist.config import (
     Config,
     parse_templating_default,
     resolve_default_target,
@@ -17,14 +17,14 @@ from dcmexporter.config import (
 
 def run_export(cfg: Config) -> int:
     """Run the export. Replaced in tests; wired to orchestrator in Task 13."""
-    from dcmexporter.orchestrator import export  # type: ignore[import-untyped]
+    from dcmassist.orchestrator import export  # type: ignore[import-untyped]
 
     return export(cfg)
 
 
 def _default_comment() -> str:
     return (
-        "Definition exported by https://github.com/jamiekt/dcmexporter on "
+        "Definition exported by https://github.com/jamiekt/dcmassist on "
         f"{date.today().isoformat()}"
     )
 
@@ -32,7 +32,7 @@ def _default_comment() -> str:
 @click.group()
 @click.version_option()
 def cli() -> None:
-    """dcmexporter — export Snowflake object definitions for DCM projects."""
+    """dcmassist — export Snowflake object definitions for DCM projects."""
 
 
 @cli.command()

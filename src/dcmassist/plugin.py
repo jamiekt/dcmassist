@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Iterator
 
-from dcmexporter.types import DCM_TYPES, FQN
+from dcmassist.types import DCM_TYPES, FQN
 
 ProgressCallback = Callable[[str], None]
 

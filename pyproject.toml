@@ -1,5 +1,5 @@
 [project]
-name = "dcmexporter"
+name = "dcmassist"
 version = "0.1"
 description = "Export Snowflake object definitions for use in a DCM project"
 readme = "README.md"
@@ -30,12 +30,12 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/jamiekt/dcmexporter"
-Repository = "https://github.com/jamiekt/dcmexporter"
-Issues = "https://github.com/jamiekt/dcmexporter/issues"
+Homepage = "https://github.com/jamiekt/dcmassist"
+Repository = "https://github.com/jamiekt/dcmassist"
+Issues = "https://github.com/jamiekt/dcmassist/issues"
 
 [project.scripts]
-dcmexporter = "dcmexporter.__main__:main"
+dcmassist = "dcmassist.__main__:main"
 
 [build-system]
 requires = ["hatchling"]

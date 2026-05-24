@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 import pkgutil
 
-from dcmexporter.plugin import PluginRegistry
+from dcmassist.plugin import PluginRegistry
 
 
 def build_registry() -> PluginRegistry:

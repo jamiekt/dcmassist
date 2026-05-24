@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 
 import jinja2
 
-from dcmexporter.objects.schema import plugin
-from dcmexporter.types import FQN
+from dcmassist.objects.schema import plugin
+from dcmassist.types import FQN
 
 
 def test_discover_uses_show_schemas_in_database_when_no_filter() -> None:

@@ -370,7 +370,7 @@ wheels = [
 ]
 
 [[package]]
-name = "dcmexporter"
+name = "dcmassist"
 version = "0.1"
 source = { editable = "." }
 dependencies = [

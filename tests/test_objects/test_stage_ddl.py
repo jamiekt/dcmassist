@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from dcmexporter.objects._stage_ddl import (
+from dcmassist.objects._stage_ddl import (
     StageNotExportable,
     synthesize_stage_ddl,
 )
-from dcmexporter.types import FQN
+from dcmassist.types import FQN
 
 
 def _row(parent: str, prop: str, value: str) -> dict:

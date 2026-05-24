@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from dcmexporter.objects._base import V1ObjectPlugin
-from dcmexporter.objects._schema_ddl import (
+from dcmassist.objects._base import V1ObjectPlugin
+from dcmassist.objects._schema_ddl import (
     SchemaNotExportable,
     synthesize_schema_ddl,
 )
-from dcmexporter.objects._show_paging import paginated_show
-from dcmexporter.plugin import ProgressCallback
-from dcmexporter.types import FQN
+from dcmassist.objects._show_paging import paginated_show
+from dcmassist.plugin import ProgressCallback
+from dcmassist.types import FQN
 
 
 class SchemaPlugin(V1ObjectPlugin):

@@ -6,20 +6,20 @@ import dataclasses
 import sys
 from typing import Any
 
-from dcmexporter.chunking import (
+from dcmassist.chunking import (
     OBJECTS_PER_FILE_ENV,
     chunk_blocks,
     resolve_objects_per_file,
 )
-from dcmexporter.config import Config, filter_types
-from dcmexporter.connection import open_connection, resolve_account_identifier
-from dcmexporter.log import RunLog
-from dcmexporter.makefile import render_makefile
-from dcmexporter.manifest import render_manifest
-from dcmexporter.objects import build_registry
-from dcmexporter.render import OutFolderError, prepare_out_folder, write_outputs
-from dcmexporter.status import StatusDashboard
-from dcmexporter.types import V1_TYPES
+from dcmassist.config import Config, filter_types
+from dcmassist.connection import open_connection, resolve_account_identifier
+from dcmassist.log import RunLog
+from dcmassist.makefile import render_makefile
+from dcmassist.manifest import render_manifest
+from dcmassist.objects import build_registry
+from dcmassist.render import OutFolderError, prepare_out_folder, write_outputs
+from dcmassist.status import StatusDashboard
+from dcmassist.types import V1_TYPES
 
 
 def export(cfg: Config) -> int:
@@ -27,7 +27,7 @@ def export(cfg: Config) -> int:
     try:
         objects_per_file = resolve_objects_per_file()
     except ValueError as exc:
-        print(f"[dcmexporter] {exc}", file=sys.stderr)
+        print(f"[dcmassist] {exc}", file=sys.stderr)
         return 5
     account_identifier = ""
     conn: Any | None = None
@@ -37,10 +37,10 @@ def export(cfg: Config) -> int:
         try:
             prepare_out_folder(cfg.out_folder, force=cfg.force)
         except OutFolderError as exc:
-            print(f"[dcmexporter] {exc}", file=sys.stderr)
+            print(f"[dcmassist] {exc}", file=sys.stderr)
             return 5
 
-        log = RunLog(cfg.out_folder / "dcmexporter.log")
+        log = RunLog(cfg.out_folder / "dcmassist.log")
         log.info("export starting")
         for field in dataclasses.fields(cfg):
             log.info(f"  {field.name}={getattr(cfg, field.name)!r}")
@@ -66,7 +66,7 @@ def export(cfg: Config) -> int:
                     if not cfg.includes:
                         log.warn(f"skipping unsupported type: {type_name}")
                         status.log(
-                            f"[dcmexporter] skipping unsupported type: {type_name}"
+                            f"[dcmassist] skipping unsupported type: {type_name}"
                         )
                     continue
                 plugin = registry.get(type_name)
@@ -85,7 +85,7 @@ def export(cfg: Config) -> int:
                         log.info(f"  {schema}: {count} {type_name}(s)")
                 except Exception as exc:  # noqa: BLE001
                     log.error(f"discover failed for {type_name}: {exc}")
-                    status.log(f"[dcmexporter] discover failed for {type_name}: {exc}")
+                    status.log(f"[dcmassist] discover failed for {type_name}: {exc}")
                     errors += 1
                     status.set_counts(
                         exported=exported, errors=errors, skipped=skipped_missing
@@ -157,7 +157,7 @@ def export(cfg: Config) -> int:
         if cfg.templating_configuration_keys and cfg.configurations:
             keys = ", ".join(cfg.templating_configuration_keys)
             print(
-                f"[dcmexporter] reminder: fill values for keys [{keys}] "
+                f"[dcmassist] reminder: fill values for keys [{keys}] "
                 "under each configuration in manifest.yml",
                 file=sys.stderr,
             )
@@ -166,7 +166,7 @@ def export(cfg: Config) -> int:
             f"export finished exported={exported} errors={errors} "
             f"skipped_missing={skipped_missing}"
         )
-        summary = f"[dcmexporter] exported={exported} errors={errors}"
+        summary = f"[dcmassist] exported={exported} errors={errors}"
         if skipped_missing:
             summary += f" skipped_missing={skipped_missing}"
         summary += f" log={log.path}"
