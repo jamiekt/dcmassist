@@ -5,8 +5,13 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import jinja2
+import pytest
 
-from dcmassist.objects.sequence import plugin
+from dcmassist.objects.sequence import (
+    SequenceParseError,
+    parse_sequence_ddl,
+    plugin,
+)
 from dcmassist.types import FQN
 
 
@@ -66,7 +71,32 @@ def test_to_define_and_invocation_macro_mode() -> None:
         database="MYDB",
     )
     assert out.startswith("{{ define_sequence(")
-    assert "raw=" in out
+    # No raw=: every clause must be a structured kwarg.
+    assert "raw=" not in out
+    assert "database=database" in out
+    assert "schema='PUBLIC'" in out
+    assert "name='SEQ'" in out
+    assert "start=1" in out
+
+
+def test_macro_round_trip_renders_full_ddl() -> None:
+    out = plugin.to_define_and_invocation(
+        "CREATE OR REPLACE SEQUENCE MYDB.PUBLIC.SEQ START = 5 INCREMENT = 2 ORDER",
+        comment="hi",
+        use_macros=True,
+        database="MYDB",
+    )
+    rendered = (
+        jinja2.Environment()
+        .from_string(plugin.macro_definition() + "\n" + out)
+        .render(database="RUNTIME")
+    )
+    assert "DEFINE SEQUENCE RUNTIME.PUBLIC.SEQ" in rendered
+    assert "START = 5" in rendered
+    assert "INCREMENT = 2" in rendered
+    assert " ORDER" in rendered
+    assert "COMMENT='hi'" in rendered
+    assert "{{ database }}" not in rendered
 
 
 def test_to_define_and_invocation_raw_mode() -> None:
@@ -83,3 +113,59 @@ def test_to_define_and_invocation_raw_mode() -> None:
 def test_macro_definition_is_valid_jinja() -> None:
     env = jinja2.Environment()
     env.parse(plugin.macro_definition())
+
+
+@pytest.mark.parametrize(
+    "ddl,expected",
+    [
+        (
+            "DEFINE SEQUENCE MYDB.PUBLIC.SEQ;",
+            {"schema": "PUBLIC", "name": "SEQ"},
+        ),
+        (
+            "DEFINE SEQUENCE MYDB.PUBLIC.SEQ START = 1 INCREMENT = 1;",
+            {"schema": "PUBLIC", "name": "SEQ", "start": 1, "increment": 1},
+        ),
+        (
+            "DEFINE SEQUENCE MYDB.PUBLIC.SEQ START WITH 100 INCREMENT BY 5 ORDER;",
+            {
+                "schema": "PUBLIC",
+                "name": "SEQ",
+                "start": 100,
+                "increment": 5,
+                "order": True,
+            },
+        ),
+        (
+            "DEFINE SEQUENCE MYDB.PUBLIC.SEQ WITH START 1 NOORDER;",
+            {"schema": "PUBLIC", "name": "SEQ", "start": 1, "order": False},
+        ),
+        (
+            "DEFINE SEQUENCE MYDB.PUBLIC.SEQ COMMENT='it''s fine';",
+            {"schema": "PUBLIC", "name": "SEQ", "comment": "it's fine"},
+        ),
+        (
+            'DEFINE SEQUENCE "my-db"."weird schema"."123seq" START = 5;',
+            {"schema": "weird schema", "name": "123seq", "start": 5},
+        ),
+        (
+            "DEFINE SEQUENCE {{ database }}.PUBLIC.SEQ START = 1;",
+            {"schema": "PUBLIC", "name": "SEQ", "start": 1},
+        ),
+    ],
+)
+def test_parse_sequence_ddl_clauses(ddl: str, expected: dict) -> None:
+    assert parse_sequence_ddl(ddl) == expected
+
+
+@pytest.mark.parametrize(
+    "ddl",
+    [
+        "DEFINE SEQUENCE MYDB.PUBLIC.SEQ HELLO=WORLD;",  # unknown clause
+        "CREATE SEQUENCE MYDB.PUBLIC.SEQ;",  # CREATE not yet rewritten
+        "DEFINE SEQUENCE",  # missing FQN
+    ],
+)
+def test_parse_sequence_ddl_rejects_unsupported(ddl: str) -> None:
+    with pytest.raises(SequenceParseError):
+        parse_sequence_ddl(ddl)
