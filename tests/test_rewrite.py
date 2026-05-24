@@ -101,12 +101,26 @@ def test_render_macro_invocation_quotes_strings() -> None:
             "columns": [{"name": "X", "type": "INT"}],
         },
     )
-    assert out.startswith("{{ define_table(")
-    assert "database='{{ database }}'" in out
-    assert "schema='PUBLIC'" in out
-    assert "name='FOO'" in out
-    assert "columns=[{'name': 'X', 'type': 'INT'}]" in out
+    assert out.startswith("{{ define_table(\n")
+    assert "    database='{{ database }}'" in out
+    assert "    schema='PUBLIC'" in out
+    assert "    name='FOO'" in out
+    # List values expand one element per line.
+    assert "    columns=[\n        {'name': 'X', 'type': 'INT'}\n    ]" in out
     assert out.endswith(") }}")
+
+
+def test_render_macro_invocation_each_kwarg_on_its_own_line() -> None:
+    out = render_macro_invocation(
+        "define_table",
+        kwargs={"a": "x", "b": "y", "c": "z"},
+    )
+    lines = out.splitlines()
+    assert lines[0] == "{{ define_table("
+    assert lines[1] == "    a='x',"
+    assert lines[2] == "    b='y',"
+    assert lines[3] == "    c='z'"
+    assert lines[4] == ") }}"
 
 
 def test_render_macro_invocation_omits_none_values() -> None:

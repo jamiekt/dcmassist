@@ -153,8 +153,13 @@ class FileFormatPlugin(V1ObjectPlugin):
     GET_DDL_TYPE = "FILE_FORMAT"
     SUPPORTS_COMMENT = True
     MACRO_BODY = (
-        "{% macro define_file_format(database, schema, name, "
-        "options=None, comment=None) %}\n"
+        "{% macro define_file_format(\n"
+        "    database,\n"
+        "    schema,\n"
+        "    name,\n"
+        "    options=None,\n"
+        "    comment=None\n"
+        ") %}\n"
         "DEFINE FILE FORMAT {{ database }}.{{ schema }}.{{ name }}"
         "{% if options %}{% for k, v in options.items() %} {{ k }} = {{ v }}"
         "{% endfor %}{% endif %}"

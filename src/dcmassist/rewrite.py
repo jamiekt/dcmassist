@@ -102,25 +102,36 @@ def _jinja_str_literal(value: str) -> str:
     return f"'{escaped}'"
 
 
-def _format_value(value: object) -> str:
+def _format_value(value: object, *, indent: str = "    ") -> str:
     if isinstance(value, JinjaExpr):
         return value.source
     if isinstance(value, str):
         return _jinja_str_literal(value)
+    if isinstance(value, list) and value:
+        inner = ",\n".join(
+            f"{indent}    {_format_value(item, indent=indent + '    ')}"
+            for item in value
+        )
+        return f"[\n{inner}\n{indent}]"
     return repr(value)
 
 
 def render_macro_invocation(macro_name: str, *, kwargs: dict[str, object]) -> str:
     """Render a Jinja `{{ macro_name(...) }}` invocation with keyword args.
 
-    None values are omitted. String values are single-quoted (single quotes within
-    are backslash-escaped, matching Jinja's expression syntax). `JinjaExpr`
+    Each kwarg is placed on its own line so wide invocations stay readable;
+    list values are expanded with one element per line. None values are
+    omitted. String values are single-quoted (single quotes within are
+    backslash-escaped, matching Jinja's expression syntax). `JinjaExpr`
     values are emitted verbatim — use them for identifier references and
     expressions that must be evaluated at render time.
     """
     parts = [
-        f"{key}={_format_value(value)}"
+        f"    {key}={_format_value(value)}"
         for key, value in kwargs.items()
         if value is not None
     ]
-    return f"{{{{ {macro_name}({', '.join(parts)}) }}}}"
+    if not parts:
+        return f"{{{{ {macro_name}() }}}}"
+    body = ",\n".join(parts)
+    return f"{{{{ {macro_name}(\n{body}\n) }}}}"

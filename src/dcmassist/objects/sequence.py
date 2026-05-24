@@ -117,8 +117,15 @@ class SequencePlugin(V1ObjectPlugin):
     GET_DDL_TYPE = "SEQUENCE"
     SUPPORTS_COMMENT = True
     MACRO_BODY = (
-        "{% macro define_sequence(database, schema, name, "
-        "start=None, increment=None, order=None, comment=None) %}\n"
+        "{% macro define_sequence(\n"
+        "    database,\n"
+        "    schema,\n"
+        "    name,\n"
+        "    start=None,\n"
+        "    increment=None,\n"
+        "    order=None,\n"
+        "    comment=None\n"
+        ") %}\n"
         "DEFINE SEQUENCE {{ database }}.{{ schema }}.{{ name }}"
         "{% if start is not none %} START = {{ start }}{% endif %}"
         "{% if increment is not none %} INCREMENT = {{ increment }}{% endif %}"

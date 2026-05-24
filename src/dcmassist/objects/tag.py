@@ -115,8 +115,13 @@ class TagPlugin(V1ObjectPlugin):
     GET_DDL_TYPE = "TAG"
     SUPPORTS_COMMENT = True
     MACRO_BODY = (
-        "{% macro define_tag(database, schema, name, "
-        "allowed_values=None, comment=None) %}\n"
+        "{% macro define_tag(\n"
+        "    database,\n"
+        "    schema,\n"
+        "    name,\n"
+        "    allowed_values=None,\n"
+        "    comment=None\n"
+        ") %}\n"
         "DEFINE TAG {{ database }}.{{ schema }}.{{ name }}"
         "{% if allowed_values %} ALLOWED_VALUES "
         "{% for v in allowed_values %}'{{ v }}'"

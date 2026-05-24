@@ -105,8 +105,14 @@ class StagePlugin(V1ObjectPlugin):
     GET_DDL_TYPE = "STAGE"
     SUPPORTS_COMMENT = True
     MACRO_BODY = (
-        "{% macro define_stage(database, schema, name, "
-        "url=None, storage_integration=None, comment=None) %}\n"
+        "{% macro define_stage(\n"
+        "    database,\n"
+        "    schema,\n"
+        "    name,\n"
+        "    url=None,\n"
+        "    storage_integration=None,\n"
+        "    comment=None\n"
+        ") %}\n"
         "DEFINE STAGE {{ database }}.{{ schema }}.{{ name }}"
         "{% if url is not none %} URL = '{{ url }}'{% endif %}"
         "{% if storage_integration is not none %}"
