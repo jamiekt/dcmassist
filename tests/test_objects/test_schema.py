@@ -22,8 +22,33 @@ def test_discover_uses_show_schemas_in_database_when_no_filter() -> None:
     ]
     out = plugin.discover(cursor, "MYDB", None)
     assert sql_log == ["SHOW SCHEMAS IN DATABASE MYDB LIMIT 10000"]
-    # INFORMATION_SCHEMA is excluded (system schema).
-    assert [str(f) for f in out] == ["MYDB.ANALYTICS.ANALYTICS", "MYDB.PUBLIC.PUBLIC"]
+    # PUBLIC and INFORMATION_SCHEMA are always present in a Snowflake DB —
+    # DCM rejects DEFINE SCHEMA for schemas that already exist, so neither
+    # is emitted. (Objects *inside* PUBLIC are still exported by other
+    # plugins.)
+    assert [str(f) for f in out] == ["MYDB.ANALYTICS.ANALYTICS"]
+
+
+def test_discover_skips_public_when_filter_includes_it() -> None:
+    """Even when --schema PUBLIC is passed, no DEFINE SCHEMA is emitted for
+    PUBLIC — but objects inside PUBLIC remain in scope for other plugins."""
+    cursor = MagicMock()
+    sql_log: list[str] = []
+    cursor.execute.side_effect = lambda sql: sql_log.append(sql)
+    fetch_responses = iter(
+        [
+            [{"name": "PUBLIC", "database_name": "MYDB"}],
+            [{"name": "ANALYTICS", "database_name": "MYDB"}],
+        ]
+    )
+    cursor.fetchall.side_effect = lambda: next(fetch_responses)
+
+    out = plugin.discover(cursor, "MYDB", ("PUBLIC", "ANALYTICS"))
+    assert sql_log == [
+        "SHOW SCHEMAS LIKE 'PUBLIC' IN DATABASE MYDB",
+        "SHOW SCHEMAS LIKE 'ANALYTICS' IN DATABASE MYDB",
+    ]
+    assert [str(f) for f in out] == ["MYDB.ANALYTICS.ANALYTICS"]
 
 
 def test_discover_filters_with_like_per_schema() -> None:

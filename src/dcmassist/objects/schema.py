@@ -187,6 +187,10 @@ class SchemaPlugin(V1ObjectPlugin):
         # SHOW SCHEMAS returns `name` (schema) and `database_name`; there is no
         # `schema_name`. The schema's FQN is db.schema.schema since the schema's
         # name is its own schema component.
+        # PUBLIC and INFORMATION_SCHEMA are always present in a Snowflake
+        # database, so we skip emitting DEFINE SCHEMA for them — DCM rejects
+        # defining a schema that already exists. Objects *inside* PUBLIC are
+        # still exported by the per-type plugins.
         rows: list[dict[str, Any]] = []
         if schemas:
             # Snowflake LIKE doesn't accept arbitrary lists; enumerate explicitly.
@@ -198,11 +202,12 @@ class SchemaPlugin(V1ObjectPlugin):
                 cursor.execute(f"SHOW SCHEMAS LIKE '{name}' IN DATABASE {database}")
                 rows.extend(cursor.fetchall())
         else:
-            page_rows = paginated_show(cursor, f"SHOW SCHEMAS IN DATABASE {database}")
-            rows.extend(row for row in page_rows if row["name"] != "INFORMATION_SCHEMA")
+            rows.extend(paginated_show(cursor, f"SHOW SCHEMAS IN DATABASE {database}"))
 
         out = [
-            FQN(database=database, schema=row["name"], name=row["name"]) for row in rows
+            FQN(database=database, schema=row["name"], name=row["name"])
+            for row in rows
+            if row["name"] not in ("PUBLIC", "INFORMATION_SCHEMA")
         ]
         return sorted(out, key=lambda f: f.name)
 
