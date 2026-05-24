@@ -20,11 +20,9 @@ from typing import Any
 from dcmassist.objects._show_paging import paginated_show
 from dcmassist.plugin import ObjectPlugin, ProgressCallback
 from dcmassist.rewrite import (
-    JinjaExpr,
     create_to_define,
     inject_comment_if_missing,
     parameterise_database,
-    parameterise_database_as_expr,
     render_macro_invocation,
 )
 from dcmassist.types import FQN
@@ -149,18 +147,12 @@ class V1ObjectPlugin(ObjectPlugin):
     def _macro_kwargs_from_ddl(
         self, define_ddl: str, *, database: str
     ) -> dict[str, Any]:
-        """Default: pass the whole DDL through a `raw` kwarg as a Jinja
-        string-concat expression so references to the runtime `database`
-        variable stay live (a plain string literal would inertly contain the
-        text `{{ database }}` after one Jinja pass — see
-        `parameterise_database_as_expr`).
-
-        Subclasses override this to extract structured kwargs from the AST.
-        """
-        return {
-            "database": JinjaExpr("database"),
-            "raw": parameterise_database_as_expr(define_ddl, database=database),
-        }
+        """Subclasses must override to extract structured kwargs for their
+        macro from the DEFINE DDL produced by the rewrite chain. Every v1 type
+        has bespoke parser logic — there is no longer a sensible default."""
+        raise NotImplementedError(
+            f"{self.type_name} must implement _macro_kwargs_from_ddl"
+        )
 
     def macro_definition(self) -> str:
         if not self.MACRO_BODY:

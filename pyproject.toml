@@ -1,6 +1,6 @@
 [project]
 name = "dcmassist"
-version = "0.3"
+version = "0.4"
 description = "Export Snowflake object definitions for use in a DCM project"
 readme = "README.md"
 requires-python = ">=3.10"

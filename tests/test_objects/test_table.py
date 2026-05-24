@@ -5,8 +5,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import jinja2
+import pytest
 
-from dcmassist.objects.table import plugin
+from dcmassist.objects.table import TableParseError, parse_table_ddl, plugin
 from dcmassist.types import FQN
 
 
@@ -64,17 +65,35 @@ def test_to_define_and_invocation_macro_mode() -> None:
         database="MYDB",
     )
     assert out.startswith("{{ define_table(")
-    assert "raw=" in out
-    # database must reach the macro as an identifier ref, not a string literal
-    # — otherwise the {{ database }} inside `raw` stays literal after one pass.
+    assert "raw=" not in out
     assert "database=database" in out
-    # Rendering the macro + invocation together must substitute the runtime db.
+    assert "schema='PUBLIC'" in out
+    assert "name='T'" in out
+
+
+def test_macro_round_trip_renders_full_ddl() -> None:
+    out = plugin.to_define_and_invocation(
+        "CREATE OR REPLACE TRANSIENT TABLE MYDB.PUBLIC.T ("
+        "ID INT NOT NULL, NAME VARCHAR(100) DEFAULT 'x') "
+        "CLUSTER BY (ID) DATA_RETENTION_TIME_IN_DAYS = 3 "
+        "CHANGE_TRACKING = TRUE COPY GRANTS",
+        comment="hi",
+        use_macros=True,
+        database="MYDB",
+    )
     rendered = (
         jinja2.Environment()
         .from_string(plugin.macro_definition() + "\n" + out)
         .render(database="RUNTIME")
     )
-    assert "DEFINE TABLE RUNTIME.PUBLIC.T" in rendered
+    assert "DEFINE TRANSIENT TABLE RUNTIME.PUBLIC.T" in rendered
+    assert "ID INT NOT NULL" in rendered
+    assert "NAME VARCHAR(100) DEFAULT 'x'" in rendered
+    assert "CLUSTER BY (ID)" in rendered
+    assert "DATA_RETENTION_TIME_IN_DAYS = 3" in rendered
+    assert "CHANGE_TRACKING = TRUE" in rendered
+    assert "COPY GRANTS" in rendered
+    assert "COMMENT='hi'" in rendered
     assert "{{ database }}" not in rendered
 
 
@@ -92,3 +111,107 @@ def test_to_define_and_invocation_raw_mode() -> None:
 def test_macro_definition_is_valid_jinja() -> None:
     env = jinja2.Environment()
     env.parse(plugin.macro_definition())
+
+
+@pytest.mark.parametrize(
+    "ddl,expected",
+    [
+        (
+            "DEFINE TABLE MYDB.PUBLIC.T (X INT);",
+            {"schema": "PUBLIC", "name": "T", "columns": ["X INT"]},
+        ),
+        (
+            "DEFINE TRANSIENT TABLE MYDB.PUBLIC.T (X INT, Y VARCHAR);",
+            {
+                "schema": "PUBLIC",
+                "name": "T",
+                "transient": True,
+                "columns": ["X INT", "Y VARCHAR"],
+            },
+        ),
+        (
+            "DEFINE TABLE MYDB.PUBLIC.T (X INT) CLUSTER BY (X, SUBSTR(X, 1, 4));",
+            {
+                "schema": "PUBLIC",
+                "name": "T",
+                "columns": ["X INT"],
+                "cluster_by": ["X", "SUBSTR(X, 1, 4)"],
+            },
+        ),
+        (
+            "DEFINE TABLE MYDB.PUBLIC.T (X INT) "
+            "DATA_RETENTION_TIME_IN_DAYS = 7 "
+            "MAX_DATA_EXTENSION_TIME_IN_DAYS = 14;",
+            {
+                "schema": "PUBLIC",
+                "name": "T",
+                "columns": ["X INT"],
+                "data_retention_time_in_days": 7,
+                "max_data_extension_time_in_days": 14,
+            },
+        ),
+        (
+            "DEFINE TABLE MYDB.PUBLIC.T (X INT) CHANGE_TRACKING = TRUE;",
+            {
+                "schema": "PUBLIC",
+                "name": "T",
+                "columns": ["X INT"],
+                "change_tracking": True,
+            },
+        ),
+        (
+            "DEFINE TABLE MYDB.PUBLIC.T (X INT) COPY GRANTS COMMENT='hi';",
+            {
+                "schema": "PUBLIC",
+                "name": "T",
+                "columns": ["X INT"],
+                "copy_grants": True,
+                "comment": "hi",
+            },
+        ),
+        (
+            "DEFINE TABLE MYDB.PUBLIC.T (X NUMBER(38,0) IDENTITY(1, 1) NOT NULL, "
+            "Y VARCHAR(100) DEFAULT 'a''b' COLLATE 'en-ci');",
+            {
+                "schema": "PUBLIC",
+                "name": "T",
+                "columns": [
+                    "X NUMBER(38,0) IDENTITY(1, 1) NOT NULL",
+                    "Y VARCHAR(100) DEFAULT 'a''b' COLLATE 'en-ci'",
+                ],
+            },
+        ),
+        (
+            'DEFINE TABLE "my-db"."weird"."T" (X INT);',
+            {"schema": "weird", "name": "T", "columns": ["X INT"]},
+        ),
+        (
+            "DEFINE TABLE {{ database }}.PUBLIC.T (X INT);",
+            {"schema": "PUBLIC", "name": "T", "columns": ["X INT"]},
+        ),
+    ],
+)
+def test_parse_table_ddl_clauses(ddl: str, expected: dict) -> None:
+    assert parse_table_ddl(ddl) == expected
+
+
+@pytest.mark.parametrize(
+    "ddl",
+    [
+        # Per-column masking policy not supported in v1.
+        "DEFINE TABLE MYDB.PUBLIC.T (A INT MASKING POLICY P);",
+        # Table-level row access policy not supported.
+        "DEFINE TABLE MYDB.PUBLIC.T (A INT) WITH ROW ACCESS POLICY P ON (A);",
+        # WITH TAG clause not supported.
+        "DEFINE TABLE MYDB.PUBLIC.T (A INT) WITH TAG (MYDB.PUBLIC.TG = 'x');",
+        # CREATE not yet rewritten.
+        "CREATE TABLE MYDB.PUBLIC.T (X INT);",
+        # Missing columns.
+        "DEFINE TABLE MYDB.PUBLIC.T;",
+        # Unknown clause.
+        "DEFINE TABLE MYDB.PUBLIC.T (X INT) HELLO=WORLD;",
+    ],
+)
+def test_parse_table_ddl_rejects_unsupported(ddl: str) -> None:
+    with pytest.raises(TableParseError):
+        parse_table_ddl(ddl)

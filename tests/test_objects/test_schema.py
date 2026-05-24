@@ -5,8 +5,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import jinja2
+import pytest
 
-from dcmassist.objects.schema import plugin
+from dcmassist.objects.schema import SchemaParseError, parse_schema_ddl, plugin
 from dcmassist.types import FQN
 
 
@@ -74,7 +75,28 @@ def test_to_define_and_invocation_macro_mode() -> None:
         database="MYDB",
     )
     assert out.startswith("{{ define_schema(")
-    assert "raw=" in out
+    # No raw=: every clause must be a structured kwarg.
+    assert "raw=" not in out
+    assert "database=database" in out
+    assert "name='PUBLIC'" in out
+
+
+def test_macro_round_trip_renders_full_ddl() -> None:
+    out = plugin.to_define_and_invocation(
+        "CREATE OR REPLACE TRANSIENT SCHEMA MYDB.PUBLIC\n  WITH MANAGED ACCESS",
+        comment="hi",
+        use_macros=True,
+        database="MYDB",
+    )
+    rendered = (
+        jinja2.Environment()
+        .from_string(plugin.macro_definition() + "\n" + out)
+        .render(database="RUNTIME")
+    )
+    assert "DEFINE TRANSIENT SCHEMA RUNTIME.PUBLIC" in rendered
+    assert "WITH MANAGED ACCESS" in rendered
+    assert "COMMENT='hi'" in rendered
+    assert "{{ database }}" not in rendered
 
 
 def test_to_define_and_invocation_raw_mode() -> None:
@@ -91,3 +113,62 @@ def test_to_define_and_invocation_raw_mode() -> None:
 def test_macro_definition_is_valid_jinja() -> None:
     env = jinja2.Environment()
     env.parse(plugin.macro_definition())
+
+
+@pytest.mark.parametrize(
+    "ddl,expected",
+    [
+        (
+            "DEFINE SCHEMA MYDB.PUBLIC;",
+            {"name": "PUBLIC"},
+        ),
+        (
+            "DEFINE TRANSIENT SCHEMA MYDB.PUBLIC;",
+            {"name": "PUBLIC", "transient": True},
+        ),
+        (
+            "DEFINE SCHEMA MYDB.PUBLIC WITH MANAGED ACCESS;",
+            {"name": "PUBLIC", "managed_access": True},
+        ),
+        (
+            "DEFINE SCHEMA MYDB.PUBLIC DATA_RETENTION_TIME_IN_DAYS = 7 "
+            "MAX_DATA_EXTENSION_TIME_IN_DAYS = 14;",
+            {
+                "name": "PUBLIC",
+                "data_retention_time_in_days": 7,
+                "max_data_extension_time_in_days": 14,
+            },
+        ),
+        (
+            "DEFINE SCHEMA MYDB.PUBLIC DEFAULT_DDL_COLLATION = 'en-ci';",
+            {"name": "PUBLIC", "default_ddl_collation": "en-ci"},
+        ),
+        (
+            "DEFINE SCHEMA MYDB.PUBLIC COMMENT='it''s fine';",
+            {"name": "PUBLIC", "comment": "it's fine"},
+        ),
+        (
+            'DEFINE SCHEMA "my-db"."weird schema";',
+            {"name": "weird schema"},
+        ),
+        (
+            "DEFINE SCHEMA {{ database }}.PUBLIC;",
+            {"name": "PUBLIC"},
+        ),
+    ],
+)
+def test_parse_schema_ddl_clauses(ddl: str, expected: dict) -> None:
+    assert parse_schema_ddl(ddl) == expected
+
+
+@pytest.mark.parametrize(
+    "ddl",
+    [
+        "DEFINE SCHEMA MYDB.PUBLIC HELLO=WORLD;",
+        "CREATE SCHEMA MYDB.PUBLIC;",
+        "DEFINE SCHEMA",
+    ],
+)
+def test_parse_schema_ddl_rejects_unsupported(ddl: str) -> None:
+    with pytest.raises(SchemaParseError):
+        parse_schema_ddl(ddl)

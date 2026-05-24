@@ -97,38 +97,6 @@ def parameterise_database(ddl: str, *, database: str) -> str:
     return pattern.sub("{{ database }}", ddl)
 
 
-def parameterise_database_as_expr(ddl: str, *, database: str) -> JinjaExpr:
-    """Like `parameterise_database`, but returns a Jinja expression that
-    concatenates quoted DDL segments around references to the `database`
-    variable. This is what gets passed as `raw=` to a macro: when DCM does its
-    single Jinja pass, the expression evaluates to the DDL with the runtime
-    database substituted in.
-
-    `parameterise_database` produces a string containing the literal text
-    `{{ database }}`. That literal is inert when nested inside another Jinja
-    string argument — Jinja does not recurse into string literals — so the
-    rendered DDL would still contain `{{ database }}` and Snowflake would
-    reject it as a syntax error.
-    """
-    pattern = re.compile(
-        rf"(?<![A-Za-z0-9_$]){re.escape(database)}(?![A-Za-z0-9_$])",
-        re.IGNORECASE,
-    )
-    parts: list[str] = []
-    last = 0
-    for match in pattern.finditer(ddl):
-        if match.start() > last:
-            parts.append(_jinja_str_literal(ddl[last : match.start()]))
-        parts.append("database")
-        last = match.end()
-    if last < len(ddl):
-        parts.append(_jinja_str_literal(ddl[last:]))
-
-    if not parts:
-        return JinjaExpr(_jinja_str_literal(""))
-    return JinjaExpr(" ~ ".join(parts))
-
-
 def _jinja_str_literal(value: str) -> str:
     escaped = value.replace("'", "\\'")
     return f"'{escaped}'"

@@ -5,8 +5,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import jinja2
+import pytest
 
-from dcmassist.objects.stage import plugin
+from dcmassist.objects.stage import StageParseError, parse_stage_ddl, plugin
 from dcmassist.types import FQN
 
 
@@ -87,7 +88,35 @@ def test_to_define_and_invocation_macro_mode() -> None:
         database="MYDB",
     )
     assert out.startswith("{{ define_stage(")
-    assert "raw=" in out
+    assert "raw=" not in out
+    assert "database=database" in out
+    assert "schema='PUBLIC'" in out
+    assert "name='S'" in out
+
+
+def test_macro_round_trip_renders_full_ddl() -> None:
+    ddl = (
+        "CREATE OR REPLACE STAGE MYDB.PUBLIC.S\n"
+        "  URL = 's3://bucket/x/'\n"
+        "  STORAGE_INTEGRATION = MY_INT\n"
+        ";"
+    )
+    out = plugin.to_define_and_invocation(
+        ddl,
+        comment="hi",
+        use_macros=True,
+        database="MYDB",
+    )
+    rendered = (
+        jinja2.Environment()
+        .from_string(plugin.macro_definition() + "\n" + out)
+        .render(database="RUNTIME")
+    )
+    assert "DEFINE STAGE RUNTIME.PUBLIC.S" in rendered
+    assert "URL = 's3://bucket/x/'" in rendered
+    assert "STORAGE_INTEGRATION = MY_INT" in rendered
+    assert "COMMENT='hi'" in rendered
+    assert "{{ database }}" not in rendered
 
 
 def test_to_define_and_invocation_raw_mode() -> None:
@@ -110,3 +139,64 @@ def test_to_define_and_invocation_raw_mode() -> None:
 def test_macro_definition_is_valid_jinja() -> None:
     env = jinja2.Environment()
     env.parse(plugin.macro_definition())
+
+
+@pytest.mark.parametrize(
+    "ddl,expected",
+    [
+        (
+            "DEFINE STAGE MYDB.PUBLIC.S URL = 's3://x/' STORAGE_INTEGRATION = INT;",
+            {
+                "schema": "PUBLIC",
+                "name": "S",
+                "url": "s3://x/",
+                "storage_integration": "INT",
+            },
+        ),
+        (
+            "DEFINE STAGE MYDB.PUBLIC.S URL = 's3://x/' STORAGE_INTEGRATION = INT "
+            "COMMENT='hi';",
+            {
+                "schema": "PUBLIC",
+                "name": "S",
+                "url": "s3://x/",
+                "storage_integration": "INT",
+                "comment": "hi",
+            },
+        ),
+        (
+            'DEFINE STAGE "my-db"."weird"."S" URL = \'s3://x/\' STORAGE_INTEGRATION = INT;',
+            {
+                "schema": "weird",
+                "name": "S",
+                "url": "s3://x/",
+                "storage_integration": "INT",
+            },
+        ),
+        (
+            "DEFINE STAGE {{ database }}.PUBLIC.S URL = 's3://x/' "
+            "STORAGE_INTEGRATION = INT;",
+            {
+                "schema": "PUBLIC",
+                "name": "S",
+                "url": "s3://x/",
+                "storage_integration": "INT",
+            },
+        ),
+    ],
+)
+def test_parse_stage_ddl_clauses(ddl: str, expected: dict) -> None:
+    assert parse_stage_ddl(ddl) == expected
+
+
+@pytest.mark.parametrize(
+    "ddl",
+    [
+        "DEFINE STAGE MYDB.PUBLIC.S CREDENTIALS = (AWS_KEY_ID = 'AK');",
+        "CREATE STAGE MYDB.PUBLIC.S URL = 's3://x/';",
+        "DEFINE STAGE",
+    ],
+)
+def test_parse_stage_ddl_rejects_unsupported(ddl: str) -> None:
+    with pytest.raises(StageParseError):
+        parse_stage_ddl(ddl)
