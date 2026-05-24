@@ -271,10 +271,14 @@ class ViewPlugin(V1ObjectPlugin):
         "DEFINE {% if secure %}SECURE {% endif %}"
         "{% if recursive %}RECURSIVE {% endif %}VIEW "
         "{{ database }}.{{ schema }}.{{ name }}"
-        "{% if column_list %} {{ column_list }}{% endif %}"
-        "{% if copy_grants %} COPY GRANTS{% endif %}"
-        "{% if comment is not none %} COMMENT='{{ comment }}'{% endif %}"
-        " AS\n"
+        "{% if column_list %} {{ column_list }}{% endif %}\n"
+        "{%- if copy_grants %}\n"
+        "  COPY GRANTS\n"
+        "{%- endif %}\n"
+        "{%- if comment is not none %}\n"
+        "  COMMENT='{{ comment }}'\n"
+        "{%- endif %}\n"
+        "AS\n"
         "{% endmacro %}\n"
     )
 

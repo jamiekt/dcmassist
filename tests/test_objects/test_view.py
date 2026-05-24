@@ -94,7 +94,7 @@ def test_macro_round_trip_renders_full_ddl() -> None:
     )
     assert "DEFINE SECURE VIEW RUNTIME.PUBLIC.V" in rendered
     assert "COMMENT='hi'" in rendered
-    assert " AS\n" in rendered
+    assert "\nAS\n" in rendered
     assert "SELECT 1 AS X FROM RUNTIME.PUBLIC.T" in rendered
     assert "{{ database }}" not in rendered
     assert rendered.rstrip().endswith(";")
