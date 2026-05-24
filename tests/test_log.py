@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dcmexporter.log import RunLog
+from dcmassist.log import RunLog
 
 
 def test_run_log_writes_lines_with_levels(tmp_path: Path) -> None:

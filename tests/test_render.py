@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from dcmexporter.render import OutFolderError, prepare_out_folder, write_outputs
+from dcmassist.render import OutFolderError, prepare_out_folder, write_outputs
 
 
 def test_write_outputs_creates_layout(tmp_path: Path) -> None:

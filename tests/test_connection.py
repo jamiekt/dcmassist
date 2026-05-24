@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from dcmexporter.connection import (
+from dcmassist.connection import (
     SnowflakeConnectionError,
     open_connection,
     resolve_account_identifier,
@@ -14,7 +14,7 @@ from dcmexporter.connection import (
 
 
 def test_open_connection_uses_named_connection() -> None:
-    with patch("dcmexporter.connection.snowflake_connect") as connect:
+    with patch("dcmassist.connection.snowflake_connect") as connect:
         connect.return_value = MagicMock()
         open_connection(connection_name="MYCONN")
     connect.assert_called_once_with(connection_name="MYCONN")
@@ -22,7 +22,7 @@ def test_open_connection_uses_named_connection() -> None:
 
 def test_open_connection_default_uses_env_var(monkeypatch) -> None:
     monkeypatch.setenv("SNOWFLAKE_DEFAULT_CONNECTION_NAME", "envconn")
-    with patch("dcmexporter.connection.snowflake_connect") as connect:
+    with patch("dcmassist.connection.snowflake_connect") as connect:
         connect.return_value = MagicMock()
         open_connection(connection_name=None)
     connect.assert_called_once_with(connection_name="envconn")
@@ -30,14 +30,14 @@ def test_open_connection_default_uses_env_var(monkeypatch) -> None:
 
 def test_open_connection_no_name_no_env_uses_default(monkeypatch) -> None:
     monkeypatch.delenv("SNOWFLAKE_DEFAULT_CONNECTION_NAME", raising=False)
-    with patch("dcmexporter.connection.snowflake_connect") as connect:
+    with patch("dcmassist.connection.snowflake_connect") as connect:
         connect.return_value = MagicMock()
         open_connection(connection_name=None)
     connect.assert_called_once_with()
 
 
 def test_open_connection_failure_wraps() -> None:
-    with patch("dcmexporter.connection.snowflake_connect") as connect:
+    with patch("dcmassist.connection.snowflake_connect") as connect:
         connect.side_effect = RuntimeError("boom")
         with pytest.raises(SnowflakeConnectionError, match="boom"):
             open_connection(connection_name="bad")
@@ -68,10 +68,10 @@ def test_open_connection_yields_dict_cursor(monkeypatch) -> None:
             return FakeCursor()
 
     monkeypatch.setattr(
-        "dcmexporter.connection.snowflake_connect", lambda **_: FakeConn()
+        "dcmassist.connection.snowflake_connect", lambda **_: FakeConn()
     )
 
-    from dcmexporter.connection import open_connection
+    from dcmassist.connection import open_connection
     from snowflake.connector import DictCursor
 
     conn = open_connection(None)

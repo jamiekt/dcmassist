@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from dcmexporter.objects._show_paging import paginated_show
+from dcmassist.objects._show_paging import paginated_show
 
 
 def test_single_page_under_limit() -> None:

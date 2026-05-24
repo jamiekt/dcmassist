@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 
-from dcmexporter.status import StatusDashboard
+from dcmassist.status import StatusDashboard
 
 
 class _TtyStream(io.StringIO):
@@ -14,7 +14,7 @@ class _TtyStream(io.StringIO):
 
 def test_silent_when_not_tty(monkeypatch) -> None:
     monkeypatch.delenv("NO_COLOR", raising=False)
-    monkeypatch.delenv("DCMEXPORTER_NO_STATUS", raising=False)
+    monkeypatch.delenv("DCMASSIST_NO_STATUS", raising=False)
     stream = io.StringIO()
     with StatusDashboard(stream=stream) as dash:
         dash.set_database("MYDB")
@@ -25,7 +25,7 @@ def test_silent_when_not_tty(monkeypatch) -> None:
 
 
 def test_disabled_by_no_status_env(monkeypatch) -> None:
-    monkeypatch.setenv("DCMEXPORTER_NO_STATUS", "1")
+    monkeypatch.setenv("DCMASSIST_NO_STATUS", "1")
     stream = _TtyStream()
     with StatusDashboard(stream=stream) as dash:
         dash.set_database("MYDB")
@@ -38,7 +38,7 @@ def test_disabled_by_no_color_env(monkeypatch) -> None:
     colour to be readable, so we treat NO_COLOR as 'no dashboard' rather than
     rendering a degraded plain panel."""
     monkeypatch.setenv("NO_COLOR", "1")
-    monkeypatch.delenv("DCMEXPORTER_NO_STATUS", raising=False)
+    monkeypatch.delenv("DCMASSIST_NO_STATUS", raising=False)
     stream = _TtyStream()
     with StatusDashboard(stream=stream) as dash:
         dash.set_database("MYDB")
@@ -48,7 +48,7 @@ def test_disabled_by_no_color_env(monkeypatch) -> None:
 
 def test_renders_panel_content_when_tty(monkeypatch) -> None:
     monkeypatch.delenv("NO_COLOR", raising=False)
-    monkeypatch.delenv("DCMEXPORTER_NO_STATUS", raising=False)
+    monkeypatch.delenv("DCMASSIST_NO_STATUS", raising=False)
     stream = _TtyStream()
     with StatusDashboard(stream=stream) as dash:
         dash.set_database("MYDB")
@@ -68,11 +68,11 @@ def test_log_writes_above_panel(monkeypatch) -> None:
     """Errors and warnings need to scroll above the live panel rather than
     overwrite it. Verify .log() output appears in the stream."""
     monkeypatch.delenv("NO_COLOR", raising=False)
-    monkeypatch.delenv("DCMEXPORTER_NO_STATUS", raising=False)
+    monkeypatch.delenv("DCMASSIST_NO_STATUS", raising=False)
     stream = _TtyStream()
     with StatusDashboard(stream=stream) as dash:
         dash.set_database("MYDB")
-        dash.log("[dcmexporter] discover failed for Tag: <reason>")
+        dash.log("[dcmassist] discover failed for Tag: <reason>")
     assert "discover failed for Tag" in stream.getvalue()
 
 
@@ -81,10 +81,10 @@ def test_log_writes_to_stream_when_disabled(monkeypatch) -> None:
     and errors to surface in piped/CI output. log() should fall back to
     writing the message directly to the stream rather than dropping it."""
     monkeypatch.delenv("NO_COLOR", raising=False)
-    monkeypatch.delenv("DCMEXPORTER_NO_STATUS", raising=False)
+    monkeypatch.delenv("DCMASSIST_NO_STATUS", raising=False)
     stream = io.StringIO()
     with StatusDashboard(stream=stream) as dash:
-        dash.log("[dcmexporter] discover failed for Tag: <reason>")
+        dash.log("[dcmassist] discover failed for Tag: <reason>")
     assert "discover failed for Tag" in stream.getvalue()
 
 

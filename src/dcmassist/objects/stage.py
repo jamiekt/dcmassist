@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from dcmexporter.objects._base import V1ObjectPlugin
-from dcmexporter.objects._stage_ddl import synthesize_stage_ddl
-from dcmexporter.types import FQN
+from dcmassist.objects._base import V1ObjectPlugin
+from dcmassist.objects._stage_ddl import synthesize_stage_ddl
+from dcmassist.types import FQN
 
 
 class StagePlugin(V1ObjectPlugin):

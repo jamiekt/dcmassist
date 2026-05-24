@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 
 import jinja2
 
-from dcmexporter.objects.sequence import plugin
-from dcmexporter.types import FQN
+from dcmassist.objects.sequence import plugin
+from dcmassist.types import FQN
 
 
 def test_discover_lists_schemas_then_iterates() -> None:

@@ -17,15 +17,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from dcmexporter.objects._show_paging import paginated_show
-from dcmexporter.plugin import ObjectPlugin, ProgressCallback
-from dcmexporter.rewrite import (
+from dcmassist.objects._show_paging import paginated_show
+from dcmassist.plugin import ObjectPlugin, ProgressCallback
+from dcmassist.rewrite import (
     create_to_define,
     inject_comment_if_missing,
     parameterise_database,
     render_macro_invocation,
 )
-from dcmexporter.types import FQN
+from dcmassist.types import FQN
 
 
 class V1ObjectPlugin(ObjectPlugin):

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-`dcmexporter` is a CLI that exports Snowflake object definitions (tables, views, schemas, stages, …) into the on-disk layout expected by a Snowflake DCM (Declarative Change Management) project: `manifest.yml`, `Makefile`, `sources/definitions/<type>.sql`, and optionally `sources/macros/<type>.sql`.
+`dcmassist` is a CLI that exports Snowflake object definitions (tables, views, schemas, stages, …) into the on-disk layout expected by a Snowflake DCM (Declarative Change Management) project: `manifest.yml`, `Makefile`, `sources/definitions/<type>.sql`, and optionally `sources/macros/<type>.sql`.
 
 The exported DDL is committed to a DCM project (i.e. git). Stage DDL is synthesized from `DESC STAGE` and **must never include AWS credentials** — credentials belong to the storage integration, not the stage.
 
@@ -14,7 +14,7 @@ The project uses `uv` for everything; do not invoke `pip` or `python` directly.
 
 | Task | Command |
 |------|---------|
-| Run the CLI | `uv run dcmexporter export --database <DB> [--force]` |
+| Run the CLI | `uv run dcmassist export --database <DB> [--force]` |
 | Run all tests | `uv run pytest` |
 | Run one file | `uv run pytest tests/test_orchestrator.py -v` |
 | Run one test | `uv run pytest tests/test_orchestrator.py::test_export_writes_full_layout -v` |
@@ -34,7 +34,7 @@ The hook does NOT run pytest — run it manually before committing.
 
 1. `resolve_objects_per_file()` — read `DCMASSIST_EXPORT_OBJECTS_PER_FILE` BEFORE touching the output folder (a bad value must not blow away the user's directory).
 2. `prepare_out_folder()` — refuse non-empty unless `--force`; clear and recreate.
-3. Open `RunLog` at `<out>/dcmexporter.log` and dump every Config field so users see (and discover) available options.
+3. Open `RunLog` at `<out>/dcmassist.log` and dump every Config field so users see (and discover) available options.
 4. Inside a `StatusDashboard` (Rich `Live` panel), connect to Snowflake and iterate `filter_types(cfg)`.
 5. For each type, dispatch to its plugin: `discover()` → per-FQN `get_ddl()` → `to_define_and_invocation()`.
 6. Chunk per-type blocks via `chunk_blocks()` into `dict[filename, body]` keyed by FULL filename (`table.sql`, `table2.sql`, …). The first chunk keeps the unsuffixed name so small exports look identical to before chunking existed.
@@ -42,9 +42,9 @@ The hook does NOT run pytest — run it manually before committing.
 
 Exit codes: `0` ok, `4` exported nothing but had errors, `5` config/setup error (bad env var or non-empty out folder).
 
-### Plugin system (`src/dcmexporter/objects/`)
+### Plugin system (`src/dcmassist/objects/`)
 
-Plugins are auto-discovered: `objects/__init__.py:build_registry()` imports every non-underscore module and calls `registry.register(module.plugin)`. `_unimplemented.py` is a special case that registers a list of stub plugins for types DCM supports but dcmexporter doesn't yet handle.
+Plugins are auto-discovered: `objects/__init__.py:build_registry()` imports every non-underscore module and calls `registry.register(module.plugin)`. `_unimplemented.py` is a special case that registers a list of stub plugins for types DCM supports but dcmassist doesn't yet handle.
 
 To add a new v1 type: create `objects/<type>.py`, subclass `V1ObjectPlugin` from `_base.py`, set `type_name`, `file_slug`, `SHOW_FORM`, `GET_DDL_TYPE`, `MACRO_BODY`, instantiate as module-level `plugin`. Add the canonical name to `V1_TYPES` in `types.py`.
 
@@ -61,8 +61,8 @@ To add a new v1 type: create `objects/<type>.py`, subclass `V1ObjectPlugin` from
 
 ### Status & logging split
 
-- `StatusDashboard` (`status.py`) — Rich `Live` panel on stderr, transient (disappears at end). Silent on non-TTY, `NO_COLOR=1`, or `DCMEXPORTER_NO_STATUS=1`. `.log()` writes above the panel; falls back to plain stderr when disabled so warnings still surface in CI.
-- `RunLog` (`log.py`) — per-run timestamped log file at `<out-folder>/dcmexporter.log`. Truncated on each run. This is what users tail when something goes wrong.
+- `StatusDashboard` (`status.py`) — Rich `Live` panel on stderr, transient (disappears at end). Silent on non-TTY, `NO_COLOR=1`, or `DCMASSIST_NO_STATUS=1`. `.log()` writes above the panel; falls back to plain stderr when disabled so warnings still surface in CI.
+- `RunLog` (`log.py`) — per-run timestamped log file at `<out-folder>/dcmassist.log`. Truncated on each run. This is what users tail when something goes wrong.
 
 The dashboard answers "what's happening right now"; the log answers "what happened to which object and why".
 
@@ -72,4 +72,4 @@ The dashboard answers "what's happening right now"; the log answers "what happen
 - Module docstrings should explain why the module exists, not list its contents.
 - Don't add backwards-compatibility shims, dead defensive code, or feature flags for hypothetical futures. The codebase is pre-1.0 and prefers clean breaks over migration scaffolding.
 - Plans and specs live under `docs/superpowers/plans/` and `docs/superpowers/specs/` and are written via the `superpowers:writing-plans` and `superpowers:brainstorming` skills.
-- The tool will be renamed `dcmexporter` → `dcmassist` in a future PR. New env vars use the `DCMASSIST_*` prefix (e.g. `DCMASSIST_EXPORT_OBJECTS_PER_FILE`); legacy `DCMEXPORTER_*` env vars (e.g. `DCMEXPORTER_NO_STATUS`) will be migrated then.
+- The tool was renamed from `dcmexporter` → `dcmassist`. Older plans/specs under `docs/superpowers/` still use the old name (they're snapshots) — don't update them retroactively.

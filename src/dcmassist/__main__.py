@@ -1,8 +1,8 @@
-"""Entry point for the dcmexporter CLI."""
+"""Entry point for the dcmassist CLI."""
 
 from __future__ import annotations
 
-from dcmexporter.cli import cli
+from dcmassist.cli import cli
 
 
 def main() -> None:

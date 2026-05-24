@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from dcmexporter.types import UNIMPLEMENTED_TYPES, V1_TYPES, normalise_type
+from dcmassist.types import UNIMPLEMENTED_TYPES, V1_TYPES, normalise_type
 
 
 @dataclass(frozen=True)
@@ -78,7 +78,7 @@ def validate_config(cfg: Config) -> Config:
         if value in UNIMPLEMENTED_TYPES:
             raise ValueError(
                 f"Type {value!r} is in DCM's supported set but not yet supported "
-                "by dcmexporter"
+                "by dcmassist"
             )
 
     return replace(cfg, includes=includes, excludes=excludes)

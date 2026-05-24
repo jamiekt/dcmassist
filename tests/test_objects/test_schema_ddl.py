@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from dcmexporter.objects._schema_ddl import (
+from dcmassist.objects._schema_ddl import (
     SchemaNotExportable,
     synthesize_schema_ddl,
 )
-from dcmexporter.types import FQN
+from dcmassist.types import FQN
 
 
 def _row(**overrides: object) -> dict:

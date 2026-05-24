@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dcmexporter.config import Config
-from dcmexporter.manifest import render_manifest
+from dcmassist.config import Config
+from dcmassist.manifest import render_manifest
 
 
 def _cfg(**overrides) -> Config:

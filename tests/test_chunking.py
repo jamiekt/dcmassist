@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from dcmexporter.chunking import (
+from dcmassist.chunking import (
     DEFAULT_OBJECTS_PER_FILE,
     OBJECTS_PER_FILE_ENV,
     chunk_blocks,

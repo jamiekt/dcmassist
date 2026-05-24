@@ -1,11 +1,11 @@
-"""Stub plugins for DCM types that are not yet supported by dcmexporter."""
+"""Stub plugins for DCM types that are not yet supported by dcmassist."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from dcmexporter.plugin import ObjectPlugin, ProgressCallback
-from dcmexporter.types import UNIMPLEMENTED_TYPES, FQN
+from dcmassist.plugin import ObjectPlugin, ProgressCallback
+from dcmassist.types import UNIMPLEMENTED_TYPES, FQN
 
 
 def _slug(name: str) -> str:
@@ -26,7 +26,7 @@ class _UnimplementedPlugin(ObjectPlugin):
     ) -> list[FQN]:
         raise NotImplementedError(
             f"{self.type_name} is in DCM's supported set but not yet implemented "
-            "by dcmexporter"
+            "by dcmassist"
         )
 
     def get_ddl(self, cursor: Any, fqn: FQN) -> str:
