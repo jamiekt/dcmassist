@@ -20,7 +20,10 @@ The project uses `uv` for everything; do not invoke `pip` or `python` directly.
 | Run one test | `uv run pytest tests/test_orchestrator.py::test_export_writes_full_layout -v` |
 | Lint | `uv run ruff check src tests` |
 | Format check | `uv run ruff format --check src tests` |
+| Auto-fix | `uv run ruff check --fix src tests && uv run ruff format src tests` |
 | Type check | `uv run mypy src` |
+
+User-facing CLI flags (`--use-macros`, `--include`, `--schema`, `--target`, `--configuration`, `--templating-default`, `--out-folder`, `--force`) are documented in `README.md` § "Quick examples" and defined in `cli.py`. Run `uv run dcmassist export --help` for the full list.
 
 A pre-commit hook runs `ruff format`, `ruff` (with `--fix`), and `mypy src` across the whole tree on every commit. **Never bypass it with `--no-verify`** — if a hook fails, fix the underlying issue. If a refactor breaks a different file's call site, that's a sign two changes need to land in one commit (this has happened before with the orchestrator/render and orchestrator/status pairs).
 
@@ -39,6 +42,8 @@ The hook does NOT run pytest — run it manually before committing.
 5. For each type, dispatch to its plugin: `discover()` → per-FQN `get_ddl()` → `to_define_and_invocation()`.
 6. Chunk per-type blocks via `chunk_blocks()` into `dict[filename, body]` keyed by FULL filename (`table.sql`, `table2.sql`, …). The first chunk keeps the unsuffixed name so small exports look identical to before chunking existed.
 7. `write_outputs()` writes the dict to disk. It is mechanical — naming logic lives in the orchestrator; macros are still keyed by slug.
+
+Definitions chunk into `<slug>.sql`, `<slug>2.sql`, … past the threshold; macros stay one-per-type at `<slug>.sql`. Chunking exists for diff readability of large DDL files; macro files are short by construction and don't need it.
 
 Exit codes: `0` ok, `4` exported nothing but had errors, `5` config/setup error (bad env var or non-empty out folder).
 
@@ -65,6 +70,16 @@ To add a new v1 type: create `objects/<type>.py`, subclass `V1ObjectPlugin` from
 - `RunLog` (`log.py`) — per-run timestamped log file at `<out-folder>/dcmassist-export.log`. Truncated on each run. This is what users tail when something goes wrong.
 
 The dashboard answers "what's happening right now"; the log answers "what happened to which object and why".
+
+### Testing patterns
+
+- Orchestrator-level tests mock the Snowflake cursor end-to-end via the `_cfg()` / `execute_side_effect` pattern in `tests/test_orchestrator.py` — reuse it rather than reinventing.
+- Plugin tests (`tests/test_objects/test_*.py`) exercise discovery and rewrite chains in isolation, with no cursor where avoidable.
+- `tmp_path` is fine for output-folder fixtures. New env vars should have a test that sets them via `monkeypatch.setenv` covering both the success path and an invalid value.
+
+### Repo housekeeping
+
+- `out/` at the repo root is gitignored scratch space from local runs — ignore stray artifacts there.
 
 ## Conventions
 
