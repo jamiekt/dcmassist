@@ -262,3 +262,37 @@ def test_export_invalid_objects_per_file_returns_5(
     assert not out.exists()
     err = capsys.readouterr().err
     assert "DCMASSIST_EXPORT_OBJECTS_PER_FILE" in err
+
+
+def test_export_logs_all_config_options_at_start(tmp_path: Path) -> None:
+    """The header of dcmexporter.log records every Config field plus the
+    resolved chunk size, so users can see what options were chosen and
+    discover ones they didn't know about."""
+    out = tmp_path / "out"
+
+    fake_cursor = MagicMock()
+    fake_conn = MagicMock()
+    fake_conn.account = "AB12345"
+    fake_conn.cursor.return_value = fake_cursor
+
+    def execute_side_effect(sql, *args, **kwargs):
+        fake_cursor._last_sql = sql
+
+    def fetchall_side_effect():
+        return []
+
+    fake_cursor.execute.side_effect = execute_side_effect
+    fake_cursor.fetchall.side_effect = fetchall_side_effect
+    fake_cursor.fetchone.side_effect = lambda: None
+
+    with patch("dcmexporter.orchestrator.open_connection") as oc:
+        oc.return_value = fake_conn
+        export(_cfg(out))
+
+    log_text = (out / "dcmexporter.log").read_text()
+    assert "export starting" in log_text
+    assert "database='MYDB'" in log_text
+    assert "use_macros=True" in log_text
+    assert "force=True" in log_text
+    assert "includes=('Table',)" in log_text
+    assert "DCMASSIST_EXPORT_OBJECTS_PER_FILE=100" in log_text
