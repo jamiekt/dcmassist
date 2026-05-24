@@ -130,7 +130,13 @@ class V1ObjectPlugin(ObjectPlugin):
         comment: str | None,
         use_macros: bool,
         database: str,
+        known_schemas: frozenset[str] = frozenset(),
+        known_functions: dict[str, str] | None = None,
     ) -> str:
+        # known_schemas / known_functions are unused for v1 plugins other than
+        # View — view bodies are arbitrary SQL where bare references need
+        # qualification.
+        del known_schemas, known_functions
         define = create_to_define(ddl)
         define = inject_comment_if_missing(
             define, comment=comment, supports_comment=self.SUPPORTS_COMMENT

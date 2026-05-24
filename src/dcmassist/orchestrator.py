@@ -17,6 +17,7 @@ from dcmassist.log import RunLog
 from dcmassist.makefile import render_makefile
 from dcmassist.manifest import render_manifest
 from dcmassist.objects import build_registry
+from dcmassist.objects._show_paging import paginated_show
 from dcmassist.render import OutFolderError, prepare_out_folder, write_outputs
 from dcmassist.status import StatusDashboard
 from dcmassist.types import V1_TYPES
@@ -53,6 +54,16 @@ def export(cfg: Config) -> int:
             account_identifier = resolve_account_identifier(conn)
             cursor = conn.cursor()
             log.info(f"connected to Snowflake account={account_identifier}")
+
+            known_schemas = _list_schemas(cursor, cfg.database)
+            log.info(f"known schemas: {sorted(known_schemas)}")
+            known_functions, ambiguous = _list_functions(cursor, cfg.database)
+            log.info(f"known unambiguous callables: {len(known_functions)}")
+            for name in sorted(ambiguous):
+                log.warn(
+                    f"callable {name!r} exists in multiple schemas; "
+                    "view bodies that reference it bare will not be auto-qualified"
+                )
 
             type_names = filter_types(cfg)
             definitions: dict[str, str] = {}
@@ -104,6 +115,8 @@ def export(cfg: Config) -> int:
                             comment=cfg.comment,
                             use_macros=cfg.use_macros,
                             database=cfg.database,
+                            known_schemas=known_schemas,
+                            known_functions=known_functions,
                         )
                     except Exception as exc:  # noqa: BLE001
                         log.error(f"{type_name} {fqn}: {exc}")
@@ -183,6 +196,51 @@ def export(cfg: Config) -> int:
                 conn.close()
             except Exception:  # noqa: BLE001
                 pass
+
+
+def _list_schemas(cursor: Any, database: str) -> frozenset[str]:
+    """Return the set of schema names in `database`, used to qualify bare
+    2-part references inside view bodies (see view.py). INFORMATION_SCHEMA
+    is included — it's a legal target — but the result is consumed only as
+    a recognition set, not as enumeration."""
+    rows = paginated_show(cursor, f"SHOW SCHEMAS IN DATABASE {database}")
+    return frozenset(row["name"] for row in rows)
+
+
+def _list_functions(
+    cursor: Any, database: str
+) -> tuple[dict[str, str], frozenset[str]]:
+    """Build a name→schema map of unambiguous user functions and procedures
+    in `database`, used to qualify bare 1-part function calls in view bodies
+    (see view.py). Names that exist in more than one schema are returned
+    separately so the orchestrator can warn about them — we can't pick the
+    correct schema without resolving the search path the view was created
+    under, and a wrong guess would silently produce wrong DDL."""
+    schemas_by_name: dict[str, set[str]] = {}
+    for show_form in ("SHOW USER FUNCTIONS", "SHOW PROCEDURES"):
+        try:
+            rows = paginated_show(cursor, f"{show_form} IN DATABASE {database}")
+        except Exception:  # noqa: BLE001
+            # Some Snowflake editions / role grants reject one of these forms.
+            # Missing one is non-fatal; we just won't qualify those callables.
+            continue
+        for row in rows:
+            # SHOW USER FUNCTIONS / SHOW PROCEDURES return `name` (callable
+            # name) and `schema_name`. Names are case-sensitive in Snowflake
+            # but identifiers are uppercased unless quoted; key the map upper
+            # to match the case-insensitive regex match in the rewriter.
+            name = str(row["name"]).upper()
+            schema = str(row["schema_name"])
+            schemas_by_name.setdefault(name, set()).add(schema)
+
+    known: dict[str, str] = {}
+    ambiguous: set[str] = set()
+    for name, schemas in schemas_by_name.items():
+        if len(schemas) == 1:
+            known[name] = next(iter(schemas))
+        else:
+            ambiguous.add(name)
+    return known, frozenset(ambiguous)
 
 
 def _counts_by_schema(fqns: list[Any]) -> list[tuple[str, int]]:

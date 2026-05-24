@@ -128,6 +128,119 @@ def test_body_with_jinja_braces_is_protected() -> None:
     assert "{{ x }}" in rendered
 
 
+def test_body_2part_reference_is_qualified_when_schema_is_known() -> None:
+    """GET_DDL only fully-qualifies the view header — bare `<schema>.<obj>`
+    references in the body flow through unqualified and DCM rejects them.
+    When the orchestrator passes the database's schema set, the view plugin
+    rewrites them to `{{ database }}.<schema>.<obj>`."""
+    out = plugin.to_define_and_invocation(
+        "CREATE OR REPLACE VIEW MYDB.EMPLOYEE_COOKED.V AS "
+        "SELECT * FROM EMPLOYEE_COOKED.WORKDAY_VIEW v WHERE v.col = 1",
+        comment=None,
+        use_macros=True,
+        database="MYDB",
+        known_schemas=frozenset({"EMPLOYEE_COOKED"}),
+    )
+    rendered = (
+        jinja2.Environment()
+        .from_string(plugin.macro_definition() + "\n" + out)
+        .render(database="RUNTIME")
+    )
+    assert "RUNTIME.EMPLOYEE_COOKED.WORKDAY_VIEW v" in rendered
+    # Table-alias references (`v.col`) must NOT be touched.
+    assert "v.col = 1" in rendered
+
+
+def test_body_2part_reference_left_alone_when_left_isnt_a_known_schema() -> None:
+    """Without a schema match, the rewriter must not turn table-alias
+    expressions like `t.col` into qualified references."""
+    out = plugin.to_define_and_invocation(
+        "CREATE OR REPLACE VIEW MYDB.PUBLIC.V AS SELECT t.id FROM PUBLIC.T t",
+        comment=None,
+        use_macros=True,
+        database="MYDB",
+        known_schemas=frozenset({"PUBLIC"}),
+    )
+    rendered = (
+        jinja2.Environment()
+        .from_string(plugin.macro_definition() + "\n" + out)
+        .render(database="RUNTIME")
+    )
+    assert "RUNTIME.PUBLIC.T t" in rendered
+    # The `t.id` selector must not have become `RUNTIME.t.id`.
+    assert "RUNTIME.t.id" not in rendered
+    assert "t.id" in rendered
+
+
+def test_body_3part_reference_isnt_double_qualified() -> None:
+    """Already-3-part `MYDB.SCHEMA.OBJ` should only have its database part
+    swapped — the schema prefix must not be rewritten a second time."""
+    out = plugin.to_define_and_invocation(
+        "CREATE OR REPLACE VIEW MYDB.PUBLIC.V AS SELECT * FROM MYDB.OTHER.X",
+        comment=None,
+        use_macros=True,
+        database="MYDB",
+        known_schemas=frozenset({"PUBLIC", "OTHER"}),
+    )
+    rendered = (
+        jinja2.Environment()
+        .from_string(plugin.macro_definition() + "\n" + out)
+        .render(database="RUNTIME")
+    )
+    assert "RUNTIME.OTHER.X" in rendered
+    assert "RUNTIME.RUNTIME" not in rendered
+    assert "RUNTIME.OTHER.OTHER" not in rendered
+
+
+def test_body_bare_udf_call_is_qualified_when_function_is_known() -> None:
+    """Bare `<funcname>(` calls in a view body are qualified to
+    `{{ database }}.<schema>.<funcname>(` when the orchestrator's
+    name→schema map identifies them as unambiguous user-defined callables.
+    Built-in Snowflake functions don't appear in the map and are left
+    alone."""
+    out = plugin.to_define_and_invocation(
+        "CREATE OR REPLACE VIEW MYDB.PUBLIC.V AS "
+        "SELECT GET_COHORT_DAYS(SPLIT_PART(c, ' - ', 3)) FROM PUBLIC.T",
+        comment=None,
+        use_macros=True,
+        database="MYDB",
+        known_schemas=frozenset({"PUBLIC"}),
+        known_functions={"GET_COHORT_DAYS": "LABOR_PLANNING_COOKED"},
+    )
+    rendered = (
+        jinja2.Environment()
+        .from_string(plugin.macro_definition() + "\n" + out)
+        .render(database="RUNTIME")
+    )
+    assert "RUNTIME.LABOR_PLANNING_COOKED.GET_COHORT_DAYS(" in rendered
+    # Built-in `SPLIT_PART` (not in the map) stays bare.
+    assert "SPLIT_PART(" in rendered
+    assert "RUNTIME.LABOR_PLANNING_COOKED.SPLIT_PART" not in rendered
+
+
+def test_body_already_qualified_udf_call_isnt_double_qualified() -> None:
+    """A function call that's already 2- or 3-part qualified must not gain
+    another prefix from the function-qualification pass."""
+    out = plugin.to_define_and_invocation(
+        "CREATE OR REPLACE VIEW MYDB.PUBLIC.V AS "
+        "SELECT LABOR_PLANNING_COOKED.GET_COHORT_DAYS(c) FROM PUBLIC.T",
+        comment=None,
+        use_macros=True,
+        database="MYDB",
+        known_schemas=frozenset({"PUBLIC", "LABOR_PLANNING_COOKED"}),
+        known_functions={"GET_COHORT_DAYS": "LABOR_PLANNING_COOKED"},
+    )
+    rendered = (
+        jinja2.Environment()
+        .from_string(plugin.macro_definition() + "\n" + out)
+        .render(database="RUNTIME")
+    )
+    # Schema-qualification should kick in (2-part → 3-part) but function-
+    # qualification must not add a second prefix in front of the schema.
+    assert "RUNTIME.LABOR_PLANNING_COOKED.GET_COHORT_DAYS(" in rendered
+    assert "RUNTIME.LABOR_PLANNING_COOKED.LABOR_PLANNING_COOKED" not in rendered
+
+
 def test_to_define_and_invocation_raw_mode() -> None:
     out = plugin.to_define_and_invocation(
         "CREATE OR REPLACE VIEW MYDB.PUBLIC.V AS SELECT 1",

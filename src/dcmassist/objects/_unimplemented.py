@@ -33,7 +33,14 @@ class _UnimplementedPlugin(ObjectPlugin):
         raise NotImplementedError(self.type_name)
 
     def to_define_and_invocation(
-        self, ddl: str, *, comment: str | None, use_macros: bool, database: str
+        self,
+        ddl: str,
+        *,
+        comment: str | None,
+        use_macros: bool,
+        database: str,
+        known_schemas: frozenset[str] = frozenset(),
+        known_functions: dict[str, str] | None = None,
     ) -> str:
         raise NotImplementedError(self.type_name)
 

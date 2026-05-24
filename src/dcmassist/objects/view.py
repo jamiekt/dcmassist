@@ -146,22 +146,89 @@ def _split_schema_and_name(fqn_text: str, original_ddl: str) -> tuple[str, str]:
     )
 
 
-def _wrap_body_with_raw_blocks(body: str, *, database: str) -> str:
+def _wrap_body_with_raw_blocks(
+    body: str,
+    *,
+    database: str,
+    known_schemas: frozenset[str] = frozenset(),
+    known_functions: dict[str, str] | None = None,
+) -> str:
     """Emit the SELECT body wrapped in `{% raw %}{% endraw %}` blocks, with
     references to `database` swapped for `{{ database }}` outside the raw
     blocks so DCM's Jinja pass substitutes the runtime database while
-    leaving any literal `{{ }}` in the body intact."""
-    pattern = re.compile(
+    leaving any literal `{{ }}` in the body intact.
+
+    When `known_schemas` is supplied, 2-part references of the form
+    `<schema>.<obj>` (where `<schema>` is one of the known schemas) are
+    qualified to `{{ database }}.<schema>.<obj>` so DCM accepts them. This
+    matters because GET_DDL only fully-qualifies the view header — the body
+    is returned verbatim, so any 2-part reference relying on session context
+    flows through unqualified and DCM rejects it as
+    "Unqualified name detected for: 'Object'".
+
+    When `known_functions` is supplied (a name→schema map of unambiguous
+    UDFs/procedures in the database), bare 1-part function calls of the form
+    `<name>(` are qualified to `{{ database }}.<schema>.<name>(`. Names that
+    exist in more than one schema must be excluded by the caller (we can't
+    pick the right one without resolving the search path). Built-in
+    Snowflake functions are naturally absent from the map and so left alone.
+
+    Bare 1-part references to tables/views (no `(`) that rely on the view's
+    home schema remain a known limitation.
+
+    All matches are whole-identifier on both sides and reject occurrences
+    preceded by `.` (already 3-part qualified) or by an identifier
+    character (table-alias references like `t.col`).
+    """
+    db_pattern = re.compile(
         rf"(?<![A-Za-z0-9_$]){re.escape(database)}(?![A-Za-z0-9_$])",
         re.IGNORECASE,
     )
+    events: list[tuple[int, int, str]] = [
+        (m.start(), m.end(), "{{ database }}") for m in db_pattern.finditer(body)
+    ]
+    db_spans = {(s, e) for s, e, _ in events}
+
+    if known_schemas:
+        alternation = "|".join(
+            sorted(map(re.escape, known_schemas), key=len, reverse=True)
+        )
+        schema_pattern = re.compile(
+            rf"(?<![A-Za-z0-9_$.])(?:{alternation})\.[A-Za-z_][A-Za-z0-9_$]*"
+            r"(?![A-Za-z0-9_$])",
+            re.IGNORECASE,
+        )
+        for m in schema_pattern.finditer(body):
+            if any(s <= m.start() < e for s, e in db_spans):
+                continue
+            events.append((m.start(), m.start(), "{{ database }}."))
+
+    if known_functions:
+        alternation = "|".join(
+            sorted(map(re.escape, known_functions), key=len, reverse=True)
+        )
+        # Match `<funcname>(` not preceded by `.` (already qualified) or by
+        # an identifier character (would be a column accessor like `t.foo(`,
+        # which can't appear bare in legal SQL anyway, but defence in depth).
+        func_pattern = re.compile(
+            rf"(?<![A-Za-z0-9_$.])(?P<name>{alternation})(?=\s*\()",
+            re.IGNORECASE,
+        )
+        for m in func_pattern.finditer(body):
+            if any(s <= m.start() < e for s, e in db_spans):
+                continue
+            schema = known_functions[m.group("name").upper()]
+            events.append((m.start(), m.start(), f"{{{{ database }}}}.{schema}."))
+
+    events.sort()
+
     parts: list[str] = []
     last = 0
-    for match in pattern.finditer(body):
-        if match.start() > last:
-            parts.append("{% raw %}" + body[last : match.start()] + "{% endraw %}")
-        parts.append("{{ database }}")
-        last = match.end()
+    for start, end, jinja in events:
+        if start > last:
+            parts.append("{% raw %}" + body[last:start] + "{% endraw %}")
+        parts.append(jinja)
+        last = end
     if last < len(body):
         parts.append("{% raw %}" + body[last:] + "{% endraw %}")
     if not parts:
@@ -203,6 +270,8 @@ class ViewPlugin(V1ObjectPlugin):
         comment: str | None,
         use_macros: bool,
         database: str,
+        known_schemas: frozenset[str] = frozenset(),
+        known_functions: dict[str, str] | None = None,
     ) -> str:
         # Views don't fit the `_macro_kwargs_from_ddl` shape because the body
         # has to live outside the macro invocation (so its `{% raw %}` markers
@@ -224,7 +293,12 @@ class ViewPlugin(V1ObjectPlugin):
         kwargs["database"] = JinjaExpr("database")
 
         invocation = render_macro_invocation("define_view", kwargs=kwargs)
-        wrapped_body = _wrap_body_with_raw_blocks(body, database=database)
+        wrapped_body = _wrap_body_with_raw_blocks(
+            body,
+            database=database,
+            known_schemas=known_schemas,
+            known_functions=known_functions,
+        )
         return f"{invocation}{wrapped_body}\n;\n"
 
 
