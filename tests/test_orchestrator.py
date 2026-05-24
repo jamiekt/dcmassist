@@ -195,3 +195,70 @@ def test_export_no_objects_returns_4_when_errors(tmp_path: Path) -> None:
         code = export(_cfg(out))
 
     assert code == 4
+
+
+def test_export_chunks_definitions_when_over_threshold(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """With a small DCMASSIST_EXPORT_OBJECTS_PER_FILE, a per-type DDL list
+    that exceeds the threshold should split into table.sql, table2.sql, etc.,
+    and the log should record one line per file plus an env-var hint."""
+    monkeypatch.setenv("DCMASSIST_EXPORT_OBJECTS_PER_FILE", "2")
+
+    out = tmp_path / "out"
+    fake_cursor = MagicMock()
+    fake_conn = MagicMock()
+    fake_conn.account = "AB12345"
+    fake_conn.cursor.return_value = fake_cursor
+
+    counter = {"i": 0}
+
+    def execute_side_effect(sql, *args, **kwargs):
+        fake_cursor._last_sql = sql
+
+    def fetchall_side_effect():
+        if "SHOW SCHEMAS" in fake_cursor._last_sql:
+            return [{"name": "PUBLIC", "database_name": "MYDB"}]
+        if "SHOW TABLES" in fake_cursor._last_sql:
+            return [{"name": f"T{i}", "schema_name": "PUBLIC"} for i in range(5)]
+        return []
+
+    def fetchone_side_effect():
+        if "GET_DDL" in fake_cursor._last_sql:
+            counter["i"] += 1
+            return [f"CREATE OR REPLACE TABLE MYDB.PUBLIC.T{counter['i']} (X INT)"]
+        return None
+
+    fake_cursor.execute.side_effect = execute_side_effect
+    fake_cursor.fetchall.side_effect = fetchall_side_effect
+    fake_cursor.fetchone.side_effect = fetchone_side_effect
+
+    with patch("dcmexporter.orchestrator.open_connection") as oc:
+        oc.return_value = fake_conn
+        code = export(_cfg(out))
+
+    assert code == 0
+    defs = out / "sources" / "definitions"
+    assert (defs / "table.sql").exists()
+    assert (defs / "table2.sql").exists()
+    assert (defs / "table3.sql").exists()
+    assert not (defs / "table4.sql").exists()
+
+    log_text = (out / "dcmexporter.log").read_text()
+    assert "2 table(s) written to table.sql" in log_text
+    assert "2 table(s) written to table2.sql" in log_text
+    assert "1 table(s) written to table3.sql" in log_text
+    assert "DCMASSIST_EXPORT_OBJECTS_PER_FILE" in log_text
+
+
+def test_export_invalid_objects_per_file_returns_5(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    """A malformed env var must surface clearly and not start the export."""
+    monkeypatch.setenv("DCMASSIST_EXPORT_OBJECTS_PER_FILE", "abc")
+    out = tmp_path / "out"
+    code = export(_cfg(out))
+    assert code == 5
+    assert not out.exists()
+    err = capsys.readouterr().err
+    assert "DCMASSIST_EXPORT_OBJECTS_PER_FILE" in err

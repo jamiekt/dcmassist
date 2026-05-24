@@ -5,6 +5,11 @@ from __future__ import annotations
 import sys
 from typing import Any
 
+from dcmexporter.chunking import (
+    OBJECTS_PER_FILE_ENV,
+    chunk_blocks,
+    resolve_objects_per_file,
+)
 from dcmexporter.config import Config, filter_types
 from dcmexporter.connection import open_connection, resolve_account_identifier
 from dcmexporter.log import RunLog
@@ -18,13 +23,16 @@ from dcmexporter.types import V1_TYPES
 
 def export(cfg: Config) -> int:
     registry = build_registry()
+    try:
+        objects_per_file = resolve_objects_per_file()
+    except ValueError as exc:
+        print(f"[dcmexporter] {exc}", file=sys.stderr)
+        return 5
     account_identifier = ""
     conn: Any | None = None
     log: RunLog | None = None
 
     try:
-        # Prepare the output folder before opening the log so the log file
-        # itself isn't blown away by --force later.
         try:
             prepare_out_folder(cfg.out_folder, force=cfg.force)
         except OutFolderError as exc:
@@ -113,7 +121,19 @@ def export(cfg: Config) -> int:
                         skipped=skipped_missing,
                     )
 
-                definitions[plugin.file_slug] = "\n".join(blocks)
+                chunks = chunk_blocks(
+                    blocks, slug=plugin.file_slug, size=objects_per_file
+                )
+                for filename, chunk in chunks:
+                    definitions[filename] = "\n".join(chunk)
+                    log.info(
+                        f"{len(chunk)} {plugin.file_slug}(s) written to {filename}"
+                    )
+                if len(chunks) > 1:
+                    log.info(
+                        f"file size is configurable via {OBJECTS_PER_FILE_ENV} "
+                        f"(currently {objects_per_file})"
+                    )
                 if macros is not None:
                     macros[plugin.file_slug] = plugin.macro_definition()
 
