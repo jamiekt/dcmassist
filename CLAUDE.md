@@ -73,3 +73,4 @@ The dashboard answers "what's happening right now"; the log answers "what happen
 - Don't add backwards-compatibility shims, dead defensive code, or feature flags for hypothetical futures. The codebase is pre-1.0 and prefers clean breaks over migration scaffolding.
 - Plans and specs live under `docs/superpowers/plans/` and `docs/superpowers/specs/` and are written via the `superpowers:writing-plans` and `superpowers:brainstorming` skills.
 - The tool was renamed from `dcmexporter` → `dcmassist`. Older plans/specs under `docs/superpowers/` still use the old name (they're snapshots) — don't update them retroactively.
+- Whenever the version in `pyproject.toml` is bumped, update the pinned `uvx dcmassist@X.Y.Z` example in `README.md` to match the most recently published version. CI stamps the published version as `<pyproject-version>.<run_number>`, so the README pin should be refreshed after the resulting workflow_dispatch publishes.
