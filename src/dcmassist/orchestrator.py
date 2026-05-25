@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import sys
+import time
 from typing import Any
 
 from dcmassist.chunking import (
@@ -24,6 +25,7 @@ from dcmassist.types import V1_TYPES
 
 
 def export(cfg: Config) -> int:
+    started_at = time.monotonic()
     registry = build_registry()
     try:
         objects_per_file = resolve_objects_per_file()
@@ -179,14 +181,15 @@ def export(cfg: Config) -> int:
                 file=sys.stderr,
             )
 
+        elapsed = _format_elapsed(time.monotonic() - started_at)
         log.info(
             f"export finished exported={exported} errors={errors} "
-            f"skipped_missing={skipped_missing}"
+            f"skipped_missing={skipped_missing} elapsed={elapsed}"
         )
         summary = f"[dcmassist] exported={exported} errors={errors}"
         if skipped_missing:
             summary += f" skipped_missing={skipped_missing}"
-        summary += f" log={log.path}"
+        summary += f" elapsed={elapsed} log={log.path}"
         print(summary, file=sys.stderr)
 
         if exported == 0 and errors > 0:
@@ -200,6 +203,17 @@ def export(cfg: Config) -> int:
                 conn.close()
             except Exception:  # noqa: BLE001
                 pass
+
+
+def _format_elapsed(seconds: float) -> str:
+    total = int(round(seconds))
+    h, rem = divmod(total, 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return f"{h}h{m:02d}m{s:02d}s"
+    if m:
+        return f"{m}m{s:02d}s"
+    return f"{s}s"
 
 
 def _list_schemas(cursor: Any, database: str) -> frozenset[str]:
