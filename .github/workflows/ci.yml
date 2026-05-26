@@ -28,6 +28,7 @@ jobs:
         uses: astral-sh/setup-uv@v8.1.0
         with:
           enable-cache: true
+          cache-suffix: ${{ matrix.python-version }}
 
       - name: Set up Python
         run: uv python install ${{ matrix.python-version }}
